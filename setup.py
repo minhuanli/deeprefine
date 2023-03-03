@@ -21,7 +21,8 @@ setup(name="deeprefine",
     install_requires=[],
     entry_points={
         "console_scripts": [
-            "dr.preppdb=deeprefine.commandline.preppdb:main"
+            "dr.preppdb=deeprefine.commandline.preppdb:main",
+            "dr.runmd=deeprefinem.commandline.runmd:main"
         ]
     }
 )

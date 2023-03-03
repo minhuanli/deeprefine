@@ -3,7 +3,7 @@ from openmm import app, LangevinIntegrator
 from openmm import unit
 from mdtraj.reporters import HDF5Reporter
 
-def runMD(startPDB, prefix,
+def run_md(startPDB, prefix,
           temperature=290, eqtime=1.0, prtime=100.0, 
           reportstep=0.1, recordstep=0.01,
           implicit_solvent=True, stepsize=0.002,

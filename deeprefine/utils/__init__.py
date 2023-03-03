@@ -3,6 +3,7 @@ __all__ = [
     "align_md",
     "remove_hydrogens",
     "fix_missingresidues",
+    "run_md"
 ]
 
 from deeprefine.utils.io import (
@@ -10,4 +11,8 @@ from deeprefine.utils.io import (
     align_md,
     remove_hydrogens,
     fix_missingresidues,
+)
+
+from deeprefine.utils.md import (
+    run_md
 )
