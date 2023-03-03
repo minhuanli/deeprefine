@@ -3,7 +3,8 @@ __all__ = [
     "align_md",
     "remove_hydrogens",
     "fix_missingresidues",
-    "run_md"
+    "run_md",
+    "assert_numpy"
 ]
 
 from deeprefine.utils.io import (
@@ -15,4 +16,8 @@ from deeprefine.utils.io import (
 
 from deeprefine.utils.md import (
     run_md
+)
+
+from deeprefine.utils.types import (
+    assert_numpy
 )
