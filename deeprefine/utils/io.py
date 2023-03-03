@@ -41,6 +41,33 @@ def prep_pdb(filename, outfile, pH=7.0, keepHOH=False, missingresidue="missres.l
         with open(missingresidue, 'wb') as f:
             pickle.dump(fixer.missingResidues, f, protocol=0)
         print("Missing Residue record has been saved at:", missingresidue, flush=True)
+    
+    # The following block will make sure the fixed PDB has 
+    # the correct spacegroup as the origin PDB, or it will always be P1
+    with open(filename, "r") as file_a:
+        lines_a = file_a.readlines()
+    # Read the contents of file B
+    with open(outfile, "r") as file_b:
+        lines_b = file_b.readlines()
+    
+    # Find the index of the CRYST1 line in origin file
+    cryst1_index_a = None
+    for i, line in enumerate(lines_a):
+        if line.startswith("CRYST1"):
+            cryst1_index_a = i
+            break
+    # Find the index of the CRYST1 line in output file
+    cryst1_index_b = None
+    for i, line in enumerate(lines_b):
+        if line.startswith("CRYST1"):
+            cryst1_index_b = i
+            break
+    # Replace the CRYST1 line in file B with the CRYST1 line from file A
+    if (cryst1_index_a is not None) and (cryst1_index_b is not None):
+        lines_b[cryst1_index_b] = lines_a[cryst1_index_a]
+    # Write the updated contents of file B
+    with open(outfile, "w") as file_b:
+        file_b.writelines(lines_b)
 
     
 def align_md(traj_file, shuffle=True, ref_pdb=None):
