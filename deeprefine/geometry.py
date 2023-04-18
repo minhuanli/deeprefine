@@ -6,6 +6,7 @@ All codes are tensorflow-ified
 import torch
 import numpy as np
 import healpy as hp
+from deeprefine.utils import assert_tensor
 
 # Two vector representation of SO3
 def construct_SO3(v1, v2):
@@ -95,6 +96,7 @@ def quaternions_to_SO3(q):
     https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation#Quaternion-derived_rotation_matrix
     https://danceswithcode.net/engineeringnotes/quaternions/quaternions.html
     """
+    q = assert_tensor(q)
     q = q / q.norm(p=2, dim=-1, keepdim=True)
     r, i, j, k = q[..., 0], q[..., 1], q[..., 2], q[..., 3]
 
