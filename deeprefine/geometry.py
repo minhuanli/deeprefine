@@ -102,7 +102,7 @@ def quaternions_to_SO3(q):
 
     return torch.stack(
         [
-            1 - 2 * j * j + 2 * k * k,
+            1 - 2 * j * j - 2 * k * k,
             2 * (i * j - r * k),
             2 * (i * k + r * j),
             2 * (i * j + r * k),
