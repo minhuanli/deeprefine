@@ -25,7 +25,7 @@ def assert_tensor(x, arr_type=None):
     if is_list_or_tuple(x):
         x = np.array(x)
         x = torch.tensor(x, device=try_gpu())
-    assert isinstance(x, torch.tensor)
+    assert isinstance(x, torch.Tensor)
     if arr_type is not None:
         x = x.to(arr_type)
     return x
