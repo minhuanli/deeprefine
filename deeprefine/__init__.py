@@ -2,6 +2,9 @@
 from deeprefine import utils
 from deeprefine import energy
 from deeprefine import geometry
+from deeprefine import protein
 
 # Top level API
 from deeprefine.energy.openmm import setup_protein
+from deeprefine.protein.zmatrix import get_indices
+from deeprefine.utils.types import assert_numpy, assert_tensor

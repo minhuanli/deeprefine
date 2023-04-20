@@ -5,8 +5,8 @@ __all__ = [
     "fix_missingresidues",
     "run_md",
     "assert_numpy",
-    "assert_tensor"
-    "try_gpu"
+    "assert_tensor",
+    "try_gpu",
 ]
 
 from deeprefine.utils.io import (
@@ -22,6 +22,6 @@ from deeprefine.utils.md import (
 
 from deeprefine.utils.types import (
     assert_numpy,
-    try_gpu,
     assert_tensor,
+    try_gpu
 )
