@@ -96,7 +96,7 @@ def quaternions_to_SO3(q):
     https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation#Quaternion-derived_rotation_matrix
     https://danceswithcode.net/engineeringnotes/quaternions/quaternions.html
     """
-    q = assert_tensor(q)
+    q = assert_tensor(q, torch.float32)
     q = q / q.norm(p=2, dim=-1, keepdim=True)
     r, i, j, k = q[..., 0], q[..., 1], q[..., 2], q[..., 3]
 
