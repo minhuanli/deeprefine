@@ -18,24 +18,18 @@ Run MD for 1ns without equilibration, and record every 0.001 ns
 import argparse
 import deeprefine as dr
 
+
 class ArgumentParser(argparse.ArgumentParser):
     def __init__(self):
         super().__init__(
-            formatter_class=argparse.RawTextHelpFormatter,
-            description=__doc__
+            formatter_class=argparse.RawTextHelpFormatter, description=__doc__
         )
 
         # Required arguments
-        self.add_argument(
-            "pdb",
-            help='The path of the starting model PDB file'
-        )
+        self.add_argument("pdb", help="The path of the starting model PDB file")
 
         self.add_argument(
-            "-o",
-            "--output",
-            type=str,
-            help="The prefix of the output file name"
+            "-o", "--output", type=str, help="The prefix of the output file name"
         )
 
         # Optional arguments
@@ -44,7 +38,7 @@ class ArgumentParser(argparse.ArgumentParser):
             "--temperature",
             default=290,
             type=float,
-            help="Temperature of the simulation system, in Kelvin"
+            help="Temperature of the simulation system, in Kelvin",
         )
 
         self.add_argument(
@@ -52,7 +46,7 @@ class ArgumentParser(argparse.ArgumentParser):
             "--eqtime",
             default=1,
             type=float,
-            help="Time to simiulate for equillibration before production, in ns"
+            help="Time to simiulate for equillibration before production, in ns",
         )
 
         self.add_argument(
@@ -60,21 +54,21 @@ class ArgumentParser(argparse.ArgumentParser):
             "--prtime",
             default=100,
             type=float,
-            help="Time to simulate for production, in ns"
+            help="Time to simulate for production, in ns",
         )
 
         self.add_argument(
             "--reportstep",
             default=0.1,
             type=float,
-            help="Time between two state report, in ns"
+            help="Time between two state report, in ns",
         )
 
         self.add_argument(
             "--recordstep",
             default=0.01,
             type=float,
-            help="Time between two state recordings in production run, in ns"
+            help="Time between two state recordings in production run, in ns",
         )
 
         self.add_argument(
@@ -82,7 +76,7 @@ class ArgumentParser(argparse.ArgumentParser):
             "--stepsize",
             type=float,
             default=0.002,
-            help="The time of each MD step, in unit of picosecond"
+            help="The time of each MD step, in unit of picosecond",
         )
 
         self.add_argument(
@@ -92,15 +86,11 @@ class ArgumentParser(argparse.ArgumentParser):
             help="Using implicit solvent model or explicit solvent model. \
                   It will determine the forcefield in use. \
                   Note: If you have HOH in your starting PDB file, \
-                  you must use explicit solvent model, or it will give error."
+                  you must use explicit solvent model, or it will give error.",
         )
 
-        self.add_argument(
-            "-v",
-            "--verbose",
-            action="store_true"
-        )
-    
+        self.add_argument("-v", "--verbose", action="store_true")
+
 
 def main():
     args = ArgumentParser().parse_args()
@@ -108,11 +98,11 @@ def main():
         args.pdb,
         args.output,
         temperature=args.temperature,
-        eqtime=args.eqtime, 
+        eqtime=args.eqtime,
         prtime=args.prtime,
-        reportstep=args.reportstep, 
+        reportstep=args.reportstep,
         recordstep=args.recordstep,
         stepsize=args.stepsize,
         implicit_solvent=args.implicitsolvent,
-        verbose=args.verbose
+        verbose=args.verbose,
     )

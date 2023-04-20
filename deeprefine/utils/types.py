@@ -29,11 +29,9 @@ def assert_tensor(x, arr_type=None):
     if arr_type is not None:
         x = x.to(arr_type)
     return x
-    
+
 
 def try_gpu(i=0):
     if torch.cuda.device_count() >= i + 1:
         return torch.device(f"cuda:{i}")
     return torch.device("cpu")
-
-
