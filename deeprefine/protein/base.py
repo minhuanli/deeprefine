@@ -172,7 +172,7 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
     v3 /= torch.norm(v3, dim=-1, keepdim=True)
     v3 *= d14 * torch.sin(a412)
 
-    v1 /= torch.norm(v1, dim=1, keepdim=True)
+    v1 /= torch.norm(v1, dim=-1, keepdim=True)
     v1 *= d14 * torch.cos(a412)
 
     position = p1 + v3 - v1
