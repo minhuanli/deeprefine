@@ -8,7 +8,7 @@ def dist(x1, x2):
 
 def dist_torch(x1, x2):
     d = x2-x1
-    d2 = torch.sum(d*d, axis=-1)
+    d2 = torch.sum(d*d, dim=-1)
     return torch.sqrt(d2)
 
 def angle(x1, x2, x3, degrees=True):
@@ -25,10 +25,10 @@ def angle(x1, x2, x3, degrees=True):
 
 def angle_torch(x1, x2, x3, degrees=True):
     ba = x1 - x2
-    ba /= torch.norm(ba, dim=-1, keepdims=True)
+    ba /= torch.norm(ba, dim=-1, keepdim=True)
     bc = x3 - x2
-    bc /= torch.norm(bc, axis=-1, keepdims=True)
-    cosine_angle = torch.sum(ba*bc, axis=-1)
+    bc /= torch.norm(bc, dim=-1, keepdim=True)
+    cosine_angle = torch.sum(ba*bc, dim=-1)
     if degrees:
         angle = np.float32(180.0 / np.pi) * torch.acos(cosine_angle) # Range [0,180]
         return angle
@@ -69,24 +69,108 @@ def torsion_torch(x1, x2, x3, x4, degrees=True):
     b2 = x4 - x3
     # normalize b1 so that it does not influence magnitude of vector
     # rejections that come next
-    b1 /= torch.norm(b1, dim=-1, keepdims=True)
+    b1 /= torch.norm(b1, dim=-1, keepdim=True)
 
     # vector rejections
     # v = projection of b0 onto plane perpendicular to b1
     #   = b0 minus component that aligns with b1
     # w = projection of b2 onto plane perpendicular to b1
     #   = b2 minus component that aligns with b1
-    v = b0 - torch.sum(b0*b1, axis=-1, keepdims=True) * b1
-    w = b2 - torch.sum(b2*b1, axis=-1, keepdims=True) * b1
+    v = b0 - torch.sum(b0*b1, dim=-1, keepdim=True) * b1
+    w = b2 - torch.sum(b2*b1, dim=-1, keepdim=True) * b1
 
     # angle between v and w in a plane is the torsion angle
     # v and w may not be normalized but that's fine since tan is y/x
-    x = torch.sum(v*w, axis=-1)
+    x = torch.sum(v*w, dim=-1)
     b1xv = torch.cross(b1, v)
-    y = torch.sum(b1xv*w, axis=-1)
+    y = torch.sum(b1xv*w, dim=-1)
     if degrees:
         return np.float32(180.0 / np.pi) * torch.atan2(y, x)
     else:
         return torch.atan2(y, x)
 
+def xyz2ic_torch(x, Z_indices, vec_angles=False):
+    """ Computes internal coordinates from Cartesian coordinates
 
+    Parameters
+    ----------
+    x : Tensor, [n_batch, n_atoms*n_dim]
+        Catesian coordinates of all atoms
+    Z_indices : array, [n_icatoms, 4]
+        Internal coordinate index definition. 
+    vec_angles : binary, default False
+        whether or not to use cos and sin to vectorize the torsion angle
+    
+    Returns
+    -------
+    Tensor, [n_batch, n_icatoms]
+    """
+    bond_indices = Z_indices[:, :2]
+    angle_indices = Z_indices[:, :3]
+    torsion_indices = Z_indices[:, :4]
+    atom_indices = np.arange(int(3*(np.max(Z_indices)+1))).reshape((-1, 3))
+    xbonds = dist_torch(x[:,atom_indices[bond_indices[:, 0]]],
+                        x[:,atom_indices[bond_indices[:, 1]]])
+    xangles = angle_torch(x[:,atom_indices[angle_indices[:, 0]]],
+                          x[:,atom_indices[angle_indices[:, 1]]],
+                          x[:,atom_indices[angle_indices[:, 2]]])
+    xtorsions = torsion_torch(x[:,atom_indices[torsion_indices[:, 0]]],
+                              x[:,atom_indices[torsion_indices[:, 1]]],
+                              x[:,atom_indices[torsion_indices[:, 2]]],
+                              x[:,atom_indices[torsion_indices[:, 3]]])
+    if vec_angles:
+        xangles_vec = torch.stack([torch.sin(xangles*np.pi/180.), torch.cos(xangles*np.pi/180.)], dim=-1)
+        xtorsions_vec = torch.stack([torch.sin(xtorsions*np.pi/180.), torch.cos(xtorsions*np.pi/180.)], dim=-1)
+        ics = torch.concat([xbonds[..., None], xangles_vec, xtorsions_vec], dim=-1).view(xbonds.shape[0], -1)
+    else:
+        ics = torch.stack((xbonds, xangles, xtorsions), dim=-1).view(xbonds.shape[0], -1)
+    return ics
+
+
+def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
+    """Compute Cartesian coordinates from internal coordinates
+
+    Parameters
+    ----------
+    p1 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian coordinates of reference point 1
+    p2 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian coordinates of reference point 2 
+    p3 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian coordinates of refernece point 3
+    d14 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
+        Bond length between target point 4 and reference point 1 
+    a412 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
+        Bond angle between bond target point 4 - reference point 1 and bond reference point 2 - reference point 1
+    t4123 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
+        Torsion angle between bond target point 4 - reference point 1 and bond reference point 2 - reference point 3
+
+    Returns
+    -------
+    Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian Coordinates of target points
+    """
+    # convert angles to radians
+    a412 = a412 * np.pi/180.0
+    t4123 = t4123 * np.pi/180.0
+    v1 = p1 - p2
+    v2 = p1 - p3
+
+    n = torch.cross(v1, v2)
+    nn = torch.cross(v1, n)
+    n /= torch.norm(n, dim=-1, keepdims=True)
+    nn /= torch.norm(nn, dim=-1, keepdims=True)
+
+    n *= -torch.sin(t4123)
+    nn *= torch.cos(t4123)
+
+    v3 = n + nn
+    v3 /= torch.norm(v3, dim=-1, keepdims=True)
+    v3 *= d14 * torch.sin(a412)
+
+    v1 /= torch.norm(v1, dim=1, keepdims=True)
+    v1 *= d14 * torch.cos(a412)
+
+    position = p1 + v3 - v1
+
+    return position
