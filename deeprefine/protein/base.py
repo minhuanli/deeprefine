@@ -171,9 +171,6 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
     Tensor, [n_points, 3] or [n_batch, n_points, 3]
         Cartesian Coordinates of target points
     """
-    # convert angles to radians
-    a412 = a412
-    t4123 = t4123
     v1 = p1 - p2
     v2 = p1 - p3
 
@@ -194,6 +191,53 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
 
     position = p1 + v3 - v1
 
+    return position
+
+
+def ic2xyz_nerf_torch(p1, p2, p3, d14, a412, t4123):
+    """Compute Cartesian coordinates from internal coordinates, with NeRF algorithm
+    Parsons, Jerod, et al. Journal of computational chemistry 26.10 (2005): 1063-1068.
+
+    Parameters
+    ----------
+    p1 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian coordinates of reference point 1
+    p2 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian coordinates of reference point 2
+    p3 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian coordinates of refernece point 3
+    d14 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
+        Bond length between target point 4 and reference point 1
+    a412 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
+        Bond angle between bond target point 4 - reference point 1 and bond reference point 2 - reference point 1
+    t4123 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
+        Torsion angle between bond target point 4 - reference point 1 and bond reference point 2 - reference point 3
+
+    Returns
+    -------
+    Tensor, [n_points, 3] or [n_batch, n_points, 3]
+        Cartesian Coordinates of target points
+    """
+
+    a412 = np.pi - a412
+    BC = p1 - p2
+    AB = p2 - p3
+
+    bc = BC / torch.norm(BC, dim=-1, keepdim=True)
+    n = torch.cross(AB, bc)
+    n /= torch.norm(n, dim=-1, keepdim=True)
+
+    D2 = torch.concat(
+        [
+            d14 * torch.cos(a412),
+            d14 * torch.sin(a412) * torch.cos(t4123),
+            d14 * torch.sin(a412) * torch.sin(t4123),
+        ],
+        dim=-1,
+    )  # [..., 3]
+    M = torch.stack([bc, torch.cross(n, bc), n], dim=-1)  # [..., 3, 3]
+
+    position = torch.einsum("...ij,...j->...i", M, D2) + p1
     return position
 
 

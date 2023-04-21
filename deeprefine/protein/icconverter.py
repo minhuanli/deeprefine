@@ -4,11 +4,16 @@ Convert between cartesian coordinates and Internal Coordinates of protein
 import torch
 import numpy as np
 
-from deeprefine.protein.base import xyz2ic_torch, ic2xyz_torch, decompose_Z_indices
+from deeprefine.protein.base import (
+    xyz2ic_torch,
+    ic2xyz_torch,
+    ic2xyz_nerf_torch,
+    decompose_Z_indices,
+)
 from deeprefine.protein.zmatrix import get_indices
 
 
-def ics2xyz_local(ics, Z_indices, index2zorder, xyz):
+def ics2xyz_local(ics, Z_indices, index2zorder, xyz, nerf=False):
     """For systems described in both internal coordinates and cartesian coordinates: convert ic to Cartesian
 
     Parameters
@@ -23,13 +28,23 @@ def ics2xyz_local(ics, Z_indices, index2zorder, xyz):
     xyz : Tensor, [n_batch, n_refernce_atoms, 3]
         cartesian coordinates of reference atoms
 
+    nerf : binary, default False
+
     """
     # get reference atoms coordinates
     p1s = xyz[:, index2zorder[Z_indices[:, 1]], :]
     p2s = xyz[:, index2zorder[Z_indices[:, 2]], :]
     p3s = xyz[:, index2zorder[Z_indices[:, 3]], :]
 
-    newpos = ic2xyz_torch(p1s, p2s, p3s, ics[..., 0:1], ics[..., 1:2], ics[..., 2:3])
+    if nerf:
+        newpos = ic2xyz_nerf_torch(
+            p1s, p2s, p3s, ics[..., 0:1], ics[..., 1:2], ics[..., 2:3]
+        )
+    else:
+        newpos = ic2xyz_torch(
+            p1s, p2s, p3s, ics[..., 0:1], ics[..., 1:2], ics[..., 2:3]
+        )
+
     return newpos
 
 
@@ -124,7 +139,7 @@ class ICConverter(object):
         z = torch.concat([x_cart, z_ics], dim=1)
         return z
 
-    def ic2xyz(self, z):
+    def ic2xyz(self, z, nerf=False):
         """Convert internal coordinates to cartesian coordinates
 
         Parameters
@@ -132,6 +147,9 @@ class ICConverter(object):
         z : Tensor, [n_batch, n_features]
             flattened internal coordinates of full protein atoms
             The order of atoms is the same as the grouped Z_indices
+
+        nerf : binary, default False
+            Whether or not to use nerf algorithm
 
         Returns
         -------
@@ -166,7 +184,7 @@ class ICConverter(object):
         istart = 0
         for Z_indices in self.batchwise_Z_indices:
             ics = z_ics[:, istart : (istart + Z_indices.shape[0]), :]
-            newpos = ics2xyz_local(ics, Z_indices, self.index2order, xyz)
+            newpos = ics2xyz_local(ics, Z_indices, self.index2order, xyz, nerf=nerf)
             xyz = torch.concat([xyz, newpos], dim=1)
             istart += Z_indices.shape[0]
 
