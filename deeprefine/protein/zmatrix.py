@@ -327,6 +327,7 @@ basis_Zs["PHE"] = [
     ["HZ", "CZ", "CE1", "CD1"],
 ]
 
+
 def mdtraj2Z(mdtraj_topology, cartesian=None):
     """Return Catesian and IC indices
 
@@ -336,7 +337,7 @@ def mdtraj2Z(mdtraj_topology, cartesian=None):
 
     cartesian : MDTraj selection string, or None
         Selection of root atoms, which are represented by cartesian atoms. By default None
-    
+
     Returns
     -------
     zmatrix, and root atoms index if provided
@@ -351,7 +352,7 @@ def mdtraj2Z(mdtraj_topology, cartesian=None):
         starts.append(counts + 0)
         ends.append(counts + i.n_residues - 1)
         counts += i.n_residues
-    
+
     if cartesian != None:
         notIC = mdtraj_topology.select(cartesian)
 
@@ -359,7 +360,7 @@ def mdtraj2Z(mdtraj_topology, cartesian=None):
         nterm = i in starts
         cterm = i in ends
 
-        resatoms= {a.name: a.index for a in res.atoms}
+        resatoms = {a.name: a.index for a in res.atoms}
         resname = res.name
         for entry in basis_Zs[resname]:  # template entry:
             try:
@@ -371,29 +372,33 @@ def mdtraj2Z(mdtraj_topology, cartesian=None):
             # set two additional N-term protons
             try:
                 if resatoms["H2"] not in notIC:
-                    Z.append([resatoms["H2"], resatoms["N"],
-                            resatoms["CA"], resatoms["C"]])
+                    Z.append(
+                        [resatoms["H2"], resatoms["N"], resatoms["CA"], resatoms["C"]]
+                    )
                 if resatoms["H3"] not in notIC:
-                    Z.append([resatoms["H3"], resatoms["N"],
-                            resatoms["CA"], resatoms["C"]])
+                    Z.append(
+                        [resatoms["H3"], resatoms["N"], resatoms["CA"], resatoms["C"]]
+                    )
             except:
-                pass     
+                pass
         if cterm:
             # place OXT
             try:
                 if resatoms["OXT"] not in notIC:
-                    Z.append([resatoms["OXT"], resatoms["C"],
-                            resatoms["CA"], resatoms["N"]])
+                    Z.append(
+                        [resatoms["OXT"], resatoms["C"], resatoms["CA"], resatoms["N"]]
+                    )
             except:
                 pass
-            
+
     if cartesian != None:
         return Z, notIC
     else:
         return Z
-    
-def get_indices(top, cart_sele_str='name CA name C name N'):
-    """ Returns Cartesian and IC indices
+
+
+def get_indices(top, cart_sele_str="name CA name C name N"):
+    """Returns Cartesian and IC indices
 
     Parameters
     ----------
@@ -413,5 +418,7 @@ def get_indices(top, cart_sele_str='name CA name C name N'):
     cart = top.select(cart_sele_str)
     Z_ = np.array(mdtraj2Z(top))
     # Check if the list is correct
-    assert (np.sort(np.concatenate((cart,Z_[:,0]))) == np.arange(top.n_atoms)).all(), "Something wrong with the atom list!"
+    assert (
+        np.sort(np.concatenate((cart, Z_[:, 0]))) == np.arange(top.n_atoms)
+    ).all(), "Something wrong with the atom list!"
     return np.array(cart), Z_

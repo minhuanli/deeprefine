@@ -1,45 +1,50 @@
 import numpy as np
 import torch
 
+
 def dist(x1, x2):
-    d = x2-x1
-    d2 = np.sum(d*d, axis=-1)
+    d = x2 - x1
+    d2 = np.sum(d * d, axis=-1)
     return np.sqrt(d2)
 
+
 def dist_torch(x1, x2):
-    d = x2-x1
-    d2 = torch.sum(d*d, dim=-1)
+    d = x2 - x1
+    d2 = torch.sum(d * d, dim=-1)
     return torch.sqrt(d2)
+
 
 def angle(x1, x2, x3, degrees=False):
     ba = x1 - x2
     ba /= np.linalg.norm(ba, axis=-1, keepdims=True)
     bc = x3 - x2
     bc /= np.linalg.norm(bc, axis=-1, keepdims=True)
-    cosine_angle = np.sum(ba*bc, axis=-1)
+    cosine_angle = np.sum(ba * bc, axis=-1)
     if degrees:
-        angle = np.degrees(np.arccos(cosine_angle)) # Range [0,180]
-        return angle 
+        angle = np.degrees(np.arccos(cosine_angle))  # Range [0,180]
+        return angle
     else:  # Range [0, pi]
-        return np.arccos(cosine_angle) 
+        return np.arccos(cosine_angle)
+
 
 def angle_torch(x1, x2, x3, degrees=False):
     ba = x1 - x2
     ba /= torch.norm(ba, dim=-1, keepdim=True)
     bc = x3 - x2
     bc /= torch.norm(bc, dim=-1, keepdim=True)
-    cosine_angle = torch.sum(ba*bc, dim=-1)
+    cosine_angle = torch.sum(ba * bc, dim=-1)
     if degrees:
-        angle = np.float32(180.0 / np.pi) * torch.acos(cosine_angle) # Range [0,180]
+        angle = np.float32(180.0 / np.pi) * torch.acos(cosine_angle)  # Range [0,180]
         return angle
-    else: # Range [0, pi]
-        return torch.acos(cosine_angle) 
+    else:  # Range [0, pi]
+        return torch.acos(cosine_angle)
 
-# See Ref: https://stackoverflow.com/questions/20305272/dihedral-torsion-angle-from-four-points-in-cartesian-coordinates-in-python 
+
+# See Ref: https://stackoverflow.com/questions/20305272/dihedral-torsion-angle-from-four-points-in-cartesian-coordinates-in-python
 def torsion(x1, x2, x3, x4, degrees=False):
     """Praxeolitic formula
     1 sqrt, 1 cross product"""
-    b0 = -1.0*(x2 - x1)
+    b0 = -1.0 * (x2 - x1)
     b1 = x3 - x2
     b2 = x4 - x3
     # normalize b1 so that it does not influence magnitude of vector
@@ -51,14 +56,14 @@ def torsion(x1, x2, x3, x4, degrees=False):
     #   = b0 minus component that aligns with b1
     # w = projection of b2 onto plane perpendicular to b1
     #   = b2 minus component that aligns with b1
-    v = b0 - np.sum(b0*b1, axis=-1, keepdims=True) * b1
-    w = b2 - np.sum(b2*b1, axis=-1, keepdims=True) * b1
+    v = b0 - np.sum(b0 * b1, axis=-1, keepdims=True) * b1
+    w = b2 - np.sum(b2 * b1, axis=-1, keepdims=True) * b1
 
     # angle between v and w in a plane is the torsion angle
     # v and w may not be normalized but that's fine since tan is y/x
-    x = np.sum(v*w, axis=-1)
+    x = np.sum(v * w, axis=-1)
     b1xv = np.cross(b1, v, axisa=-1, axisb=-1)
-    y = np.sum(b1xv*w, axis=-1)
+    y = np.sum(b1xv * w, axis=-1)
     if degrees:
         return np.degrees(np.arctan2(y, x))
     else:
@@ -68,7 +73,7 @@ def torsion(x1, x2, x3, x4, degrees=False):
 def torsion_torch(x1, x2, x3, x4, degrees=False):
     """Praxeolitic formula
     1 sqrt, 1 cross product"""
-    b0 = -1.0*(x2 - x1)
+    b0 = -1.0 * (x2 - x1)
     b1 = x3 - x2
     b2 = x4 - x3
     # normalize b1 so that it does not influence magnitude of vector
@@ -80,31 +85,32 @@ def torsion_torch(x1, x2, x3, x4, degrees=False):
     #   = b0 minus component that aligns with b1
     # w = projection of b2 onto plane perpendicular to b1
     #   = b2 minus component that aligns with b1
-    v = b0 - torch.sum(b0*b1, dim=-1, keepdim=True) * b1
-    w = b2 - torch.sum(b2*b1, dim=-1, keepdim=True) * b1
+    v = b0 - torch.sum(b0 * b1, dim=-1, keepdim=True) * b1
+    w = b2 - torch.sum(b2 * b1, dim=-1, keepdim=True) * b1
 
     # angle between v and w in a plane is the torsion angle
     # v and w may not be normalized but that's fine since tan is y/x
-    x = torch.sum(v*w, dim=-1)
+    x = torch.sum(v * w, dim=-1)
     b1xv = torch.cross(b1, v)
-    y = torch.sum(b1xv*w, dim=-1)
+    y = torch.sum(b1xv * w, dim=-1)
     if degrees:
         return np.float32(180.0 / np.pi) * torch.atan2(y, x)
     else:
         return torch.atan2(y, x)
 
+
 def xyz2ic_torch(x, Z_indices, vec_angles=False):
-    """ Computes internal coordinates from Cartesian coordinates
+    """Computes internal coordinates from Cartesian coordinates
 
     Parameters
     ----------
     x : Tensor, [n_batch, n_atoms*n_dim]
         Catesian coordinates of all atoms
     Z_indices : array, [n_icatoms, 4]
-        Internal coordinate index definition. 
+        Internal coordinate index definition.
     vec_angles : binary, default False
         whether or not to use cos and sin to vectorize the torsion angle
-    
+
     Returns
     -------
     Tensor, [n_batch, n_icatoms]
@@ -112,22 +118,33 @@ def xyz2ic_torch(x, Z_indices, vec_angles=False):
     bond_indices = Z_indices[:, :2]
     angle_indices = Z_indices[:, :3]
     torsion_indices = Z_indices[:, :4]
-    atom_indices = np.arange(int(3*(np.max(Z_indices)+1))).reshape((-1, 3))
-    xbonds = dist_torch(x[:,atom_indices[bond_indices[:, 0]]],
-                        x[:,atom_indices[bond_indices[:, 1]]])
-    xangles = angle_torch(x[:,atom_indices[angle_indices[:, 0]]],
-                          x[:,atom_indices[angle_indices[:, 1]]],
-                          x[:,atom_indices[angle_indices[:, 2]]])
-    xtorsions = torsion_torch(x[:,atom_indices[torsion_indices[:, 0]]],
-                              x[:,atom_indices[torsion_indices[:, 1]]],
-                              x[:,atom_indices[torsion_indices[:, 2]]],
-                              x[:,atom_indices[torsion_indices[:, 3]]])
+    atom_indices = np.arange(int(3 * (np.max(Z_indices) + 1))).reshape((-1, 3))
+    xbonds = dist_torch(
+        x[:, atom_indices[bond_indices[:, 0]]], x[:, atom_indices[bond_indices[:, 1]]]
+    )
+    xangles = angle_torch(
+        x[:, atom_indices[angle_indices[:, 0]]],
+        x[:, atom_indices[angle_indices[:, 1]]],
+        x[:, atom_indices[angle_indices[:, 2]]],
+    )
+    xtorsions = torsion_torch(
+        x[:, atom_indices[torsion_indices[:, 0]]],
+        x[:, atom_indices[torsion_indices[:, 1]]],
+        x[:, atom_indices[torsion_indices[:, 2]]],
+        x[:, atom_indices[torsion_indices[:, 3]]],
+    )
     if vec_angles:
         xangles_vec = torch.stack([torch.sin(xangles), torch.cos(xangles)], dim=-1)
-        xtorsions_vec = torch.stack([torch.sin(xtorsions), torch.cos(xtorsions)], dim=-1)
-        ics = torch.concat([xbonds[..., None], xangles_vec, xtorsions_vec], dim=-1).view(xbonds.shape[0], -1)
+        xtorsions_vec = torch.stack(
+            [torch.sin(xtorsions), torch.cos(xtorsions)], dim=-1
+        )
+        ics = torch.concat(
+            [xbonds[..., None], xangles_vec, xtorsions_vec], dim=-1
+        ).view(xbonds.shape[0], -1)
     else:
-        ics = torch.stack((xbonds, xangles, xtorsions), dim=-1).view(xbonds.shape[0], -1)
+        ics = torch.stack((xbonds, xangles, xtorsions), dim=-1).view(
+            xbonds.shape[0], -1
+        )
     return ics
 
 
@@ -139,11 +156,11 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
     p1 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
         Cartesian coordinates of reference point 1
     p2 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
-        Cartesian coordinates of reference point 2 
+        Cartesian coordinates of reference point 2
     p3 : Tensor, [n_points, 3] or [n_batch, n_points, 3]
         Cartesian coordinates of refernece point 3
     d14 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
-        Bond length between target point 4 and reference point 1 
+        Bond length between target point 4 and reference point 1
     a412 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
         Bond angle between bond target point 4 - reference point 1 and bond reference point 2 - reference point 1
     t4123 : Tensor, [n_points, 1] or [n_batch, n_points, 1]
@@ -155,8 +172,8 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
         Cartesian Coordinates of target points
     """
     # convert angles to radians
-    a412 = a412 
-    t4123 = t4123 
+    a412 = a412
+    t4123 = t4123
     v1 = p1 - p2
     v2 = p1 - p3
 
@@ -181,15 +198,16 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
 
 
 def decompose_Z_indices(cart_indices, Z_indices):
-    """Decompose the atoms into groups, for a hierarchical placement later
-    """
+    """Decompose the atoms into groups, for a hierarchical placement later"""
     known_indices = cart_indices
     Z_placed = np.zeros(Z_indices.shape[0])
     Z_indices_decomposed = []
     while np.count_nonzero(Z_placed) < Z_indices.shape[0]:
         Z_indices_cur = []
         for i in range(Z_indices.shape[0]):
-            if not Z_placed[i] and np.all([Z_indices[i, j] in known_indices for j in range(1, 4)]):
+            if not Z_placed[i] and np.all(
+                [Z_indices[i, j] in known_indices for j in range(1, 4)]
+            ):
                 Z_indices_cur.append(Z_indices[i])
                 Z_placed[i] = 1
         Z_indices_cur = np.array(Z_indices_cur)
