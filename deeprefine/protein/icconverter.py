@@ -31,21 +31,25 @@ def ics2xyz_local(ics, Z_indices, index2zorder, xyz, nerf=False):
     nerf : binary, default False
 
     """
-    # get reference atoms coordinates
-    p1s = xyz[:, index2zorder[Z_indices[:, 1]], :]
-    p2s = xyz[:, index2zorder[Z_indices[:, 2]], :]
-    p3s = xyz[:, index2zorder[Z_indices[:, 3]], :]
+    batchsize = ics.shape[0]
+    natoms_to_place = Z_indices.shape[0]
 
+    # get reference atoms coordinates
+    p1s = xyz[:, index2zorder[Z_indices[:, 1]], :].view(batchsize*natoms_to_place, 3)
+    p2s = xyz[:, index2zorder[Z_indices[:, 2]], :].view(batchsize*natoms_to_place, 3)
+    p3s = xyz[:, index2zorder[Z_indices[:, 3]], :].view(batchsize*natoms_to_place, 3)
+
+    ics_ = ics.reshape(batchsize*natoms_to_place, 3)
     if nerf:
         newpos = ic2xyz_nerf_torch(
-            p1s, p2s, p3s, ics[..., 0:1], ics[..., 1:2], ics[..., 2:3]
+            p1s, p2s, p3s, ics_[..., 0:1], ics_[..., 1:2], ics_[..., 2:3]
         )
     else:
         newpos = ic2xyz_torch(
-            p1s, p2s, p3s, ics[..., 0:1], ics[..., 1:2], ics[..., 2:3]
+            p1s, p2s, p3s, ics_[..., 0:1], ics_[..., 1:2], ics_[..., 2:3]
         )
 
-    return newpos
+    return newpos.view(batchsize, natoms_to_place, 3)
 
 
 class ICConverter(object):
@@ -179,11 +183,11 @@ class ICConverter(object):
             angles = z[:, self.angle_idxs]
             torsions = z[:, self.torsion_idxs]
 
-        z_ics = torch.stack([bonds, angles, torsions], dim=-1)
+        z_ics = torch.stack([bonds, angles, torsions], dim=-1).view(bonds.shape[0], -1)
 
         istart = 0
         for Z_indices in self.batchwise_Z_indices:
-            ics = z_ics[:, istart : (istart + Z_indices.shape[0]), :]
+            ics = z_ics[:, 3*istart : 3*(istart + Z_indices.shape[0])]
             newpos = ics2xyz_local(ics, Z_indices, self.index2order, xyz, nerf=nerf)
             xyz = torch.concat([xyz, newpos], dim=1)
             istart += Z_indices.shape[0]
