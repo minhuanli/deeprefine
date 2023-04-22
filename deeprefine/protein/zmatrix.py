@@ -77,6 +77,7 @@ basis_Zs["HIS"] = [
     ["HB3", "CB", "CA", "C"],
     ["HD2", "CD2", "CG", "CB"],
     ["HE1", "CE1", "ND1", "CG"],
+    ["HE2", "NE2", "CD2", "CG"]
 ]
 
 basis_Zs["ASP"] = [
