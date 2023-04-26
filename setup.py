@@ -22,7 +22,7 @@ setup(name="deeprefine",
     entry_points={
         "console_scripts": [
             "dr.preppdb=deeprefine.commandline.preppdb:main",
-            "dr.runmd=deeprefinem.commandline.runmd:main"
+            "dr.runmd=deeprefine.commandline.runmd:main"
         ]
     }
 )
