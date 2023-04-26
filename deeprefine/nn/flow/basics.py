@@ -39,6 +39,8 @@ class InverseFlow(Flow):
     def __init__(self, delegate):
         super().__init__()
         self._delegate = delegate
+        self.dim_in = delegate.dim_out
+        self.dim_out = delegate.dim_in
 
     def _forward(self, *xs, **kwargs):
         return self._delegate._inverse(*xs, **kwargs)

@@ -42,6 +42,8 @@ class SplitChannels(Flow):
             ndim, nchannels=nchannels, channels=channels
         )
         self._split_dim = split_dim
+        self.dim_in = ndim
+        self.dim_out = [len(isplit) for isplit in self.indices_split]
 
     def _forward(self, x):
         # split X into different coordinate channels
@@ -173,6 +175,8 @@ class RealNVP(Flow):
             activation=activation,
             **layer_args
         )
+        self.dim_in = [dim_L, dim_R]
+        self.dim_out = [dim_L, dim_R]
 
     def _forward(self, x):
         def lambda_sum(x):

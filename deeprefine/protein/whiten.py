@@ -61,7 +61,7 @@ class Whitener(object):
         super().__init__()
         if keepdims is None:
             keepdims = X0.shape[1]
-        self.dim = X0.shape[1]
+        self.dim_in = X0.shape[1]
         self.keepdims = keepdims
         self.dim_cart_signal = dim_cart_signal
         X0_np = assert_numpy(X0)
@@ -79,6 +79,7 @@ class Whitener(object):
             std = np.concatenate([std_cart, std_ic])
         else:
             X0mean, Twhiten, Tblacken, std = _pca(X0_np, keepdims=keepdims)
+        self.dim_out = Twhiten.shape[1]
         self.X0mean = assert_tensor(X0mean, arr_type=torch.float32)
         self.Twhiten = assert_tensor(Twhiten, arr_type=torch.float32)
         self.Tblacken = assert_tensor(Tblacken, arr_type=torch.float32)
@@ -90,7 +91,7 @@ class Whitener(object):
 
     def whiten(self, x):
         """
-        x : Tensor, [n_batch, n_features]
+        x : Tensor, [n_batch, dim_in]
         """
         # Whiten
         output_z = torch.matmul(x - self.X0mean, self.Twhiten)
@@ -98,7 +99,7 @@ class Whitener(object):
 
     def blacken(self, z):
         """
-        z : Tensor, [n_batch, n_features]
+        z : Tensor, [n_batch, dim_out]
         """
         output_x = torch.matmul(z, self.Tblacken) + self.X0mean
         return output_x

@@ -67,6 +67,8 @@ class ICConverter(object):
         """
         self.topology = topology
         self.cart_atom_indices, self.Z_indices_no_order = get_indices(self.topology)
+        self.n_atoms = topology.n_atoms
+        self.dim_in = self.n_atoms * 3
         self.vec_angles = vec_angles
 
         self.cart_signal_indices = np.concatenate(
@@ -80,8 +82,8 @@ class ICConverter(object):
         self.Z_indices = np.vstack(self.batchwise_Z_indices)
 
         if self.vec_angles:
-            self.dim = 3 * self.cart_atom_indices.size + 5 * self.Z_indices.shape[0]
-            n_internal = self.dim - self.dim_cart_signal
+            self.dim_out = 3 * self.cart_atom_indices.size + 5 * self.Z_indices.shape[0]
+            n_internal = self.dim_out - self.dim_cart_signal
             self.bond_idxs = self.dim_cart_signal + np.arange(n_internal // 5) * 5 + 0
             self.sinangle_idxs = (
                 self.dim_cart_signal + np.arange(n_internal // 5) * 5 + 1
@@ -96,8 +98,8 @@ class ICConverter(object):
                 self.dim_cart_signal + np.arange(n_internal // 5) * 5 + 4
             )
         else:
-            self.dim = 3 * (self.cart_atom_indices.size + self.Z_indices.shape[0])
-            n_internal = self.dim - self.dim_cart_signal
+            self.dim_out = 3 * (self.cart_atom_indices.size + self.Z_indices.shape[0])
+            n_internal = self.dim_out - self.dim_cart_signal
             self.bond_idxs = self.dim_cart_signal + np.arange(n_internal // 3) * 3 + 0
             self.angle_idxs = self.dim_cart_signal + np.arange(n_internal // 3) * 3 + 1
             self.torsion_idxs = (
@@ -123,13 +125,13 @@ class ICConverter(object):
 
         Parameters
         ----------
-        x : Tensor, [n_batch, n_atoms * 3]
+        x : Tensor, [n_batch, dim_in]
             flattened cartesian coordinates of full protein atoms
             The order of atoms is the same as the topology
 
         Returns
         -------
-        z : Tensor, [n_batch, n_features]
+        z : Tensor, [n_batch, dim_out]
             flattened internal coordinates of full protein atoms
             The order of atoms is the same as the grouped Z_indices
         """
@@ -148,7 +150,7 @@ class ICConverter(object):
 
         Parameters
         ----------
-        z : Tensor, [n_batch, n_features]
+        z : Tensor, [n_batch, dim_out]
             flattened internal coordinates of full protein atoms
             The order of atoms is the same as the grouped Z_indices
 
@@ -157,7 +159,7 @@ class ICConverter(object):
 
         Returns
         -------
-        x : Tensor, [n_batch, n_atoms * 3]
+        x : Tensor, [n_batch, dim_in]
             flattened cartesian coordinates of full protein atoms
             The order of atoms is the same as the topology
         """
