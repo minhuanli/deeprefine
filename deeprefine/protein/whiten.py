@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from deeprefine.utils import assert_numpy, try_gpu
+from deeprefine.utils import assert_numpy, assert_tensor
 
 def _pca(X0, keepdims=None, save_memory=True):
     """Implements PCA in Numpy
@@ -41,7 +41,7 @@ def directsum_np(A, B):
     return dsum
 
 class Whitener(object):
-    def __init__(self, X0, dim_cart_signal=None, keepdims=None, whiten_inverse=True):
+    def __init__(self, X0, dim_cart_signal=None, keepdims=None):
         """Performs static whitening of the data given PCA of X0
 
         Parameters:
@@ -57,9 +57,9 @@ class Whitener(object):
 
         """
         super().__init__()
-
         if keepdims is None:
             keepdims = X0.shape[1]
+        self.dim = X0.shape[1]
         self.keepdims = keepdims
         self.dim_cart_signal = dim_cart_signal
         X0_np = assert_numpy(X0)
@@ -75,10 +75,10 @@ class Whitener(object):
             std = np.concatenate([std_cart, std_ic])            
         else:
             X0mean, Twhiten, Tblacken, std = _pca(X0_np, keepdims=keepdims)
-        self.X0mean = torch.tensor(X0mean, dtype=torch.float32, device=try_gpu())
-        self.Twhiten = torch.tensor(Twhiten, dtype=torch.float32, device=try_gpu())
-        self.Tblacken = torch.tensor(Tblacken, dtype=torch.float32, device=try_gpu())
-        self.std = torch.tensor(std, dtype=torch.float32, device=try_gpu())
+        self.X0mean = assert_tensor(X0mean, arr_type=torch.float32)
+        self.Twhiten = assert_tensor(Twhiten, arr_type=torch.float32)
+        self.Tblacken = assert_tensor(Tblacken, arr_type=torch.float32)
+        self.std = assert_tensor(std, arr_type=torch.float32)
         if torch.any(self.std <= 0):
             raise ValueError(
                 "Cannot construct whiten layer because trying to keep nonpositive eigenvalues."
@@ -98,3 +98,31 @@ class Whitener(object):
         """
         output_x = torch.matmul(z, self.Tblacken) + self.X0mean
         return output_x
+    
+    @classmethod
+    def from_dict(cls, D):
+        dim = D['dim']
+        keepdims = D['keepdims']
+        dim_cart_signal = D['dim_cart_signal']
+        X0mean = D['X0mean']
+        Twhiten = D['Twhiten']
+        Tblacken = D['Tblacken']
+        std = D['std']
+        c = cls(np.random.randn(2 * dim, dim), dim_cart_signal=dim_cart_signal, keepdims=keepdims)
+
+        c.X0mean = assert_tensor(X0mean, arr_type=torch.float32)
+        c.Twhiten = assert_tensor(Twhiten, arr_type=torch.float32)
+        c.Tblacken = assert_tensor(Tblacken, arr_type=torch.float32)
+        c.std = assert_tensor(std, arr_type=torch.float32)
+        return c
+
+    def to_dict(self):
+        D = {}
+        D['dim'] = self.dim
+        D['keepdims'] = self.keepdims
+        D["dim_cart_signal"] = self.dim_cart_signal
+        D['X0mean'] = assert_numpy(self.X0mean)
+        D['Twhiten'] = assert_numpy(self.Twhiten)
+        D['Tblacken'] = assert_numpy(self.Tblacken)
+        D['std'] = assert_numpy(self.std)
+        return D
