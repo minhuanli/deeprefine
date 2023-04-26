@@ -8,4 +8,5 @@ from deeprefine import protein
 from deeprefine.energy.openmm import setup_protein
 from deeprefine.protein.zmatrix import get_indices
 from deeprefine.protein.icconverter import ICConverter
+from deeprefine.protein.whiten import Whitener
 from deeprefine.utils.types import assert_numpy, assert_tensor
