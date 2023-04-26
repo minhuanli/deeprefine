@@ -48,14 +48,14 @@ class SplitChannels(Flow):
         self.output_z = [
             x[self._range(isplit, len(x.shape))] for isplit in self.indices_split
         ]
-        return (*self.output_z, self._log_det_Jxz(x))
+        return self.output_z, self._log_det_Jxz(x)
 
     def _inverse(self, z):
         x_scrambled = torch.concatenate(z, dim=self._split_dim)
         self.output_x = x_scrambled[
             self._range(self.indices_merge, len(x_scrambled.shape))
         ]
-        return (self.output_x, self._log_det_Jzx(z))
+        return self.output_x, self._log_det_Jzx(z)
 
     def _log_det_Jxz(self, x):
         index = [slice(None)] * len(x.shape)
@@ -175,17 +175,18 @@ class RealNVP(Flow):
         )
 
     def _forward(self, x):
-
         def lambda_sum(x):
-            return torch.sum(x[0], dim=-1, keepdim=True) + torch.sum(x[1], dim=-1, keepdim=True)
+            return torch.sum(x[0], dim=-1, keepdim=True) + torch.sum(
+                x[1], dim=-1, keepdim=True
+            )
 
-        x1 = x[0] # dim_L
-        x2 = x[1] # dim_R
+        x1 = x[0]  # dim_L
+        x2 = x[1]  # dim_R
 
         y1 = x1
         s1x1 = self.S1(x1)
         t1x1 = self.T1(x1)
-        y2 = x2 * torch.exp(s1x1) + t1x1 # dim_R
+        y2 = x2 * torch.exp(s1x1) + t1x1  # dim_R
 
         self.output_z2 = y2
         s2y2 = self.S2(y2)
@@ -198,22 +199,23 @@ class RealNVP(Flow):
         return [self.output_z1, self.output_z2], self.log_det_Jxz
 
     def _inverse(self, z):
-
         def lambda_negsum(x):
-            return torch.sum(-x[0], dim=-1, keepdim=True) + torch.sum(-x[1], dim=-1, keepdim=True)
+            return torch.sum(-x[0], dim=-1, keepdim=True) + torch.sum(
+                -x[1], dim=-1, keepdim=True
+            )
 
-        z1 = z[0] # dim_L
-        z2 = z[1] # dim_R
+        z1 = z[0]  # dim_L
+        z2 = z[1]  # dim_R
 
         y2 = z2
         s2z2 = self.S2(z2)
         t2z2 = self.T2(z2)
-        y1 = (z1 - t2z2) * torch.exp(-s2z2) # dim_L
+        y1 = (z1 - t2z2) * torch.exp(-s2z2)  # dim_L
 
         self.output_x1 = y1
         s1y1 = self.S1(y1)
         t1y1 = self.T1(y1)
-        self.output_x2 = (y2 - t1y1) * torch.exp(-s1y1) # dim_R
+        self.output_x2 = (y2 - t1y1) * torch.exp(-s1y1)  # dim_R
 
         # log det(dx/dz)
         self.log_det_Jzx = lambda_negsum([s2z2, s1y1])
