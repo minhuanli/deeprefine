@@ -14,47 +14,49 @@ class SequentialFlow(Flow):
         """
         Represents a diffeomorphism that can be computed
         as a discrete finite stack of layers.
-        
+
         Returns the transformed variable and the log determinant
         of the Jacobian matrix.
-            
+
         Parameters
         ----------
         blocks : Tuple / List of flow blocks
         """
         super().__init__()
         self._blocks = nn.ModuleList(blocks)
-    
+
     @property
     def dim_in(self):
         return self._blocks[0].dim_in
-    
+
     @property
     def dim_out(self):
         return self._blocks[-1].dim_out
-    
+
     def summarize(self):
         for block in self._blocks:
-            print(f"{block.__class__.__name__:<15}: {str(block.dim_in):>12}  ->  {str(block.dim_out):>12}")
+            print(
+                f"{block.__class__.__name__:<15}: {str(block.dim_in):>12}  ->  {str(block.dim_out):>12}"
+            )
 
     def forward(self, xs, inverse=False, **kwargs):
         """
         Transforms the input along the diffeomorphism and returns
         the transformed variable together with the volume change.
-            
+
         Parameters
         ----------
         x : PyTorch Floating Tensor.
-            Input variable to be transformed. 
+            Input variable to be transformed.
             Tensor of shape `[..., n_dimensions]`.
         inverse: boolean.
             Indicates whether forward or inverse transformation shall be performed.
             If `True` computes the inverse transformation.
-        
+
         Returns
         -------
         z: PyTorch Floating Tensor.
-            Transformed variable. 
+            Transformed variable.
             Tensor of shape `[..., n_dimensions]`.
         log_det_J : PyTorch Floating Tensor.
             Total volume change as a result of the transformation.
@@ -87,31 +89,41 @@ class SequentialFlow(Flow):
 
     def __len__(self):
         return len(self._blocks)
-    
+
 
 class BoltzmannGenerator(object):
-    def __init__(self, flow, icconverter=None, whitener=None, energy_model=None, prior='normal'):
+    def __init__(
+        self, flow, icconverter=None, whitener=None, energy_model=None, prior="normal"
+    ):
         self.flow = flow
         self.icconverter = icconverter
         self.whitener = whitener
         self.energy_model = energy_model
         self.prior = prior
         dim_in = flow.dim_in
-        
+
         if whitener is not None:
-            assert dim_in == whitener.dim_out, "dim_out of whitener must be equal to dim_in of flow!"
+            assert (
+                dim_in == whitener.dim_out
+            ), "dim_out of whitener must be equal to dim_in of flow!"
             dim_in = whitener.dim_in
-        
+
         if icconverter is not None:
-            assert dim_in == icconverter.dim_out, "dim_out of iccoverter must be equal to dim_in of whitener or flow!"
+            assert (
+                dim_in == icconverter.dim_out
+            ), "dim_out of iccoverter must be equal to dim_in of whitener or flow!"
             dim_in = icconverter.dim_in
-        
+
         self.dim_in = dim_in
-        self.dim_out = flow.dim_out        
+        self.dim_out = flow.dim_out
 
     def TxzJ(self, x):
         """Transform x space to z space, with Jacobian
         x : Tensor, [n_batch, dim_in]
+
+        Returns:
+        z : Tensor, [n_batch, dim_out]
+        Rxz : Tensor, [n_batch, 1]
         """
         if self.icconverter is not None:
             x = self.icconverter.xyz2ic(x)
@@ -119,10 +131,14 @@ class BoltzmannGenerator(object):
             x = self.whitener.whiten(x)
         z, log_det_Jxz = self.flow(x)
         return z, log_det_Jxz
-    
+
     def TzxJ(self, z):
         """Transform z space to x space, with Jacobian
         z : Tensor, [n_batch, dim_out]
+
+        Returns:
+        x : Tensor, [n_batch, dim_in]
+        Rzx : Tensor, [n_batch, 1]
         """
         x, log_det_Jzx = self.flow(z, inverse=True)
         if self.whitener is not None:
@@ -130,33 +146,42 @@ class BoltzmannGenerator(object):
         if self.icconverter is not None:
             x = self.icconverter.ic2xyz(x)
         return x, log_det_Jzx
-    
+
     def summarize(self):
         """Print layer type and dim transformation"""
         if self.icconverter is not None:
-            print(f"{self.icconverter.__class__.__name__:<15}: {str(self.icconverter.dim_in):>12}  ->  {str(self.icconverter.dim_out):>12}")
+            print(
+                f"{self.icconverter.__class__.__name__:<15}: {str(self.icconverter.dim_in):>12}  ->  {str(self.icconverter.dim_out):>12}"
+            )
         if self.whitener is not None:
-            print(f"{self.whitener.__class__.__name__:<15}: {str(self.whitener.dim_in):>12}  ->  {str(self.whitener.dim_out):>12}")
+            print(
+                f"{self.whitener.__class__.__name__:<15}: {str(self.whitener.dim_in):>12}  ->  {str(self.whitener.dim_out):>12}"
+            )
         self.flow.summarize()
-       
+
     def energy_z(self, z, temperature=1.0):
         """Calculate the effective energy of z in latent sapce given a prior
         z : Tensor or array, [n_batch, dim_out]
+
+        Returns:
+        E : Tensor, [n_batch, 1]
         """
-        z = assert_numpy(z)
-        if self.prior == 'normal':
-            E = self.dim_out * np.log(np.sqrt(temperature)) + \
-                np.sum(z**2 / (2*temperature), axis=1)
-        elif self.prior == 'lognormal':
-            sample_z_normal = np.log(z)
-            E = np.sum(sample_z_normal**2 / (2*temperature),
-                       axis=1) + np.sum(sample_z_normal, axis=1)
-        elif self.prior == 'cauchy':
-            E = np.sum(np.log(1 + (z/temperature)**2), axis=1)
-        return E
+        z = assert_tensor(z)
+        if self.prior == "normal":
+            E = self.dim_out * torch.log(torch.tensor(np.sqrt(temperature)).to(z)) + torch.sum(
+                z**2 / (2 * temperature), dim=1
+            )
+        elif self.prior == "lognormal":
+            sample_z_normal = torch.log(z)
+            E = torch.sum(sample_z_normal**2 / (2 * temperature), dim=1) + torch.sum(
+                sample_z_normal, dim=1
+            )
+        elif self.prior == "cauchy":
+            E = torch.sum(torch.log(1 + (z / temperature) ** 2), dim=1)
+        return E.view(-1, 1)
 
     def sample_z(self, std=1.0, nsample=10000, return_energy=False):
-        """ Samples from prior distribution in z
+        """Samples from prior distribution in z
         Parameters:
         -----------
         temperature : float
@@ -165,34 +190,37 @@ class BoltzmannGenerator(object):
             Number of samples
         Returns:
         --------
-        sample_z : array
+        sample_z : Tensor [n_batch, dim_out]
             Samples in z-space
-        energy_z : array
+        energy_z : Tensor, [n_batch, 1]
             Energies of z samples (optional)
         """
         sample_z = None
         energy_z = None
-        if self.prior == 'normal':
-            sample_z = std * np.random.randn(nsample, self.dim_out)
-        elif self.prior == 'lognormal':
-            sample_z_normal = std * np.random.randn(nsample, self.dim_out)
-            sample_z = np.exp(sample_z_normal)
-        elif self.prior == 'cauchy':
-            from scipy.stats import cauchy
-            sample_z = cauchy(loc=0, scale=std **
-                              2).rvs(size=(nsample, self.dim_out))
+        if self.prior == "normal":
+            sample_z = std * torch.randn(nsample, self.dim_out, device=try_gpu())
+        elif self.prior == "lognormal":
+            sample_z_normal = std * torch.randn(nsample, self.dim_out, device=try_gpu())
+            sample_z = torch.exp(sample_z_normal)
+        elif self.prior == "cauchy":
+            sample_z = (
+                torch.distributions.Cauchy(loc=0, scale=std**2)
+                .sample([nsample, self.dim_out])
+                .to(try_gpu())
+            )
         else:
             raise NotImplementedError(
-                'Sampling for prior ' + self.prior + ' is not implemented.')
+                "Sampling for prior " + self.prior + " is not implemented."
+            )
 
         if return_energy:
             energy_z = self.energy_z(sample_z)
             return sample_z, energy_z
         else:
             return sample_z
-    
-    def sample(self, std=1.0, temperature=1.0, nsample=10000):
-        """ Samples from prior distribution in z and produces generated x configurations
+
+    def sample(self, std=1.0, temperature=1.0, nsample=10000, return_Tensor=True):
+        """Samples from prior distribution in z and produces generated x configurations
 
         Parameters:
         -----------
@@ -205,61 +233,82 @@ class BoltzmannGenerator(object):
         nsample : int
             Number of samples
 
+        return_Tensor : boolean
+            Whether to return torch.Tensor or np.array, default Tensor
+
         Returns:
         --------
-        sample_z : array
+        sample_z : array or Tensor, [nsample, dim_out]
             Samples in z-space
 
-        sample_x : array
+        sample_x : array or Tensor, [nsample, dim_in]
             Samples in x-space
 
-        energy_z : array
+        energy_z : array or Tensor, [nsample, 1]
             Energies of z samples
 
-        energy_x : array
+        energy_x : array or Tensor, [nsample, 1]
             Energies of x samples
 
-        log_w : array
+        log_w : array or Tensor, [nsample, 1]
             Log weight of samples
         """
 
-        sample_z, energy_z = self.sample_z(
-            std=std, nsample=nsample, return_energy=True)
-        sample_z = assert_tensor(sample_z)
+        sample_z, energy_z = self.sample_z(std=std, nsample=nsample, return_energy=True)
         sample_x, Rzx = self.TzxJ(sample_z)
         if self.energy_model is not None:
             energy_x = self.energy_model.energy(sample_x) / temperature
         else:
             energy_x = 0.0
-        sample_x = assert_numpy(sample_x)
-        energy_x = assert_numpy(energy_x)
-        Rzx = assert_numpy(Rzx)
         logw = -energy_x + energy_z + Rzx
-        return sample_z, sample_x, energy_z, energy_x, logw
-    
+        if return_Tensor:
+            return sample_z, sample_x, energy_z, energy_x, logw
+        else:
+            sample_z = assert_numpy(sample_z)
+            sample_x = assert_numpy(sample_x)
+            energy_z = assert_numpy(energy_z)
+            energy_x = assert_numpy(energy_x)
+            logw = assert_numpy(logw)
+            return sample_z, sample_x, energy_z, energy_x, logw
 
-def construct_bg(icconverter, whitener, n_realnvp=8, energy_model=None,
-           n_layers=2, n_hidden=100, n_layers_scale=None, n_hidden_scale=None,
-           activation='relu', activation_scale='tanh', init_output_scale=None, prior='normal', device=try_gpu(), **layer_args):
-    """
-    
-    """    
+
+def construct_bg(
+    icconverter,
+    whitener,
+    n_realnvp=8,
+    energy_model=None,
+    n_layers=2,
+    n_hidden=100,
+    n_layers_scale=None,
+    n_hidden_scale=None,
+    activation="relu",
+    activation_scale="tanh",
+    init_output_scale=None,
+    prior="normal",
+    device=try_gpu(),
+    **layer_args,
+):
+    """ """
     blocks = []
     sflow = SplitChannels(whitener.dim_out, nchannels=2)
     blocks.append(sflow)
     for _ in range(n_realnvp):
-        blocks.append(RealNVP(sflow.dim_out[0], sflow.dim_out[1], 
-                              n_layers=n_layers, n_hidden=n_hidden,
-                              activation=activation, n_layers_scale=n_layers_scale, 
-                              activation_scale=activation_scale, n_hidden_scale=n_hidden_scale,
-                              init_output_scale=init_output_scale, **layer_args))
+        blocks.append(
+            RealNVP(
+                sflow.dim_out[0],
+                sflow.dim_out[1],
+                n_layers=n_layers,
+                n_hidden=n_hidden,
+                activation=activation,
+                n_layers_scale=n_layers_scale,
+                activation_scale=activation_scale,
+                n_hidden_scale=n_hidden_scale,
+                init_output_scale=init_output_scale,
+                **layer_args,
+            )
+        )
     mflow = MergeChannels(whitener.dim_out, nchannels=2)
     blocks.append(mflow)
     flow = SequentialFlow(blocks).to(device)
     bg = BoltzmannGenerator(flow, icconverter, whitener, energy_model, prior)
     return bg
-
-
-    
-
-
