@@ -100,10 +100,10 @@ class RealNVP(Flow):
         dim_R,
         n_layers=2,
         n_hidden=100,
-        activation="relu",
+        activation=torch.relu,
         n_layers_scale=None,
         n_hidden_scale=None,
-        activation_scale="tanh",
+        activation_scale=torch.tanh,
         init_output_scale=0,
         **layer_args
     ):
@@ -119,7 +119,7 @@ class RealNVP(Flow):
             Number of hidden layers in the nonlinear transformations
         n_hidden : int
             Number of hidden units in each nonlinear layer
-        activation : str
+        activation : torch element-wise function, or None
             Hidden-neuron activation functions used in the nonlinear layers
         n_layers_scale : int
             Number of hidden layers in the nonlinear transformations for the scaling network
@@ -127,7 +127,7 @@ class RealNVP(Flow):
         n_hidden_scale : int
             Number of hidden units in each nonlinear layer for the scaling network.
             if None, will use n_hidden
-        activation_scale : str
+        activation_scale : torch element-wise function, or None
             Hidden-neuron activation functions used in scaling networks. If None, nl_activation will be used.
             if None, will use activation
         init_output_scale : float

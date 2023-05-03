@@ -1,6 +1,7 @@
 import numbers
 import numpy as np
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -14,7 +15,7 @@ class DenseLayer(nn.Module):
         Size of each input sample
     out_features : int
         Size of each output sample
-    activation : str, default None
+    activation : None or torch function
         Nonlinear activation type
     dropout: float, 0 - 1, default None
         Probability of an element to be zeroed
@@ -23,21 +24,24 @@ class DenseLayer(nn.Module):
     def __init__(self, in_features, out_features, activation=None, dropout=None):
         super(DenseLayer, self).__init__()
         self.linear = nn.Linear(in_features, out_features, bias=True)
-        self.activation = self._get_activation(activation)
+        if activation is None:
+            self.activation = nn.Identity()
+        else:
+            self.activation = activation
         self.dropout = self._get_dropout(dropout)
 
-    def _get_activation(self, activation):
-        if activation is None:
-            return nn.Identity()
-        elif isinstance(activation, str):
-            try:
-                return getattr(F, activation)
-            except:
-                raise ValueError(
-                    "Unsupported activation function: {}".format(activation)
-                )
-        else:
-            raise ValueError("Need a valid activation type in str")
+    # def _get_activation(self, activation):
+    #     if activation is None:
+    #         return nn.Identity()
+    #     elif isinstance(activation, str):
+    #         try:
+    #             return getattr(F, activation)
+    #         except:
+    #             raise ValueError(
+    #                 "Unsupported activation function: {}".format(activation)
+    #             )
+    #     else:
+    #         raise ValueError("Need a valid activation type in str")
 
     def _get_dropout(self, dropout):
         if dropout is None:
@@ -73,7 +77,7 @@ class DenseNet(nn.Module):
     nhidden : int
         number of neurons in each hidden layer, either a number or an array of length nlayers-1
         to specify the width of each hidden layer
-    activation : str
+    activation : torch element-wise function or None
         nonlinear activation function in hidden layers
     init_outputs : None or float or array
         None means default initialization for the output layer, otherwise it is currently initialized with 0
@@ -87,7 +91,7 @@ class DenseNet(nn.Module):
         output_size,
         nlayers=3,
         nhidden=100,
-        activation="relu",
+        activation=torch.relu,
         dropout=None,
         init_outputs=None,
         **args
