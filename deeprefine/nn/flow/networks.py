@@ -116,6 +116,10 @@ class BoltzmannGenerator(object):
 
         self.dim_in = dim_in
         self.dim_out = flow.dim_out
+    
+    @property
+    def device(self):
+        return self.whitener.Twhiten.device
 
     def TxzJ(self, x):
         """Transform x space to z space, with Jacobian
