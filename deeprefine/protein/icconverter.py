@@ -35,9 +35,9 @@ def ics2xyz_local(ics, Z_indices, index2zorder, xyz, nerf=False):
     natoms_to_place = Z_indices.shape[0]
 
     # get reference atoms coordinates
-    p1s = xyz[:, index2zorder[Z_indices[:, 1]], :].view(batchsize * natoms_to_place, 3)
-    p2s = xyz[:, index2zorder[Z_indices[:, 2]], :].view(batchsize * natoms_to_place, 3)
-    p3s = xyz[:, index2zorder[Z_indices[:, 3]], :].view(batchsize * natoms_to_place, 3)
+    p1s = xyz[:, index2zorder[Z_indices[:, 1]], :].reshape(batchsize * natoms_to_place, 3)
+    p2s = xyz[:, index2zorder[Z_indices[:, 2]], :].reshape(batchsize * natoms_to_place, 3)
+    p3s = xyz[:, index2zorder[Z_indices[:, 3]], :].reshape(batchsize * natoms_to_place, 3)
 
     ics_ = ics.reshape(batchsize * natoms_to_place, 3)
     if nerf:
@@ -49,7 +49,7 @@ def ics2xyz_local(ics, Z_indices, index2zorder, xyz, nerf=False):
             p1s, p2s, p3s, ics_[..., 0:1], ics_[..., 1:2], ics_[..., 2:3]
         )
 
-    return newpos.view(batchsize, natoms_to_place, 3)
+    return newpos.reshape(batchsize, natoms_to_place, 3)
 
 
 class ICConverter(object):
@@ -168,7 +168,7 @@ class ICConverter(object):
         x_cart = z[:, : self.dim_cart_signal]
         # split by atom
         batchsize = z.shape[0]
-        xyz = x_cart.view(batchsize, self.cart_atom_indices.size, 3)
+        xyz = x_cart.reshape(batchsize, self.cart_atom_indices.size, 3)
 
         if self.vec_angles:
             bonds = z[:, self.bond_idxs]
@@ -185,7 +185,7 @@ class ICConverter(object):
             angles = z[:, self.angle_idxs]
             torsions = z[:, self.torsion_idxs]
 
-        z_ics = torch.stack([bonds, angles, torsions], dim=-1).view(bonds.shape[0], -1)
+        z_ics = torch.stack([bonds, angles, torsions], dim=-1).reshape(bonds.shape[0], -1)
 
         istart = 0
         for Z_indices in self.batchwise_Z_indices:
@@ -195,5 +195,5 @@ class ICConverter(object):
             istart += Z_indices.shape[0]
 
         # reorganize all atom coordinates to topology order
-        x = xyz[:, self.index2order, :].view(batchsize, -1)
+        x = xyz[:, self.index2order, :].reshape(batchsize, -1)
         return x

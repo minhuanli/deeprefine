@@ -140,9 +140,9 @@ def xyz2ic_torch(x, Z_indices, vec_angles=False):
         )
         ics = torch.concat(
             [xbonds[..., None], xangles_vec, xtorsions_vec], dim=-1
-        ).view(xbonds.shape[0], -1)
+        ).reshape(xbonds.shape[0], -1)
     else:
-        ics = torch.stack((xbonds, xangles, xtorsions), dim=-1).view(
+        ics = torch.stack((xbonds, xangles, xtorsions), dim=-1).reshape(
             xbonds.shape[0], -1
         )
     return ics
