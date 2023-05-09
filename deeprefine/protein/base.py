@@ -29,9 +29,9 @@ def angle(x1, x2, x3, degrees=False):
 
 def angle_torch(x1, x2, x3, degrees=False):
     ba = x1 - x2
-    ba /= torch.norm(ba, dim=-1, keepdim=True)
+    ba = ba / torch.norm(ba, dim=-1, keepdim=True)
     bc = x3 - x2
-    bc /= torch.norm(bc, dim=-1, keepdim=True)
+    bc = bc / torch.norm(bc, dim=-1, keepdim=True)
     cosine_angle = torch.sum(ba * bc, dim=-1)
     if degrees:
         angle = np.float32(180.0 / np.pi) * torch.acos(cosine_angle)  # Range [0,180]
@@ -78,7 +78,7 @@ def torsion_torch(x1, x2, x3, x4, degrees=False):
     b2 = x4 - x3
     # normalize b1 so that it does not influence magnitude of vector
     # rejections that come next
-    b1 /= torch.norm(b1, dim=-1, keepdim=True)
+    b1 = b1 / torch.norm(b1, dim=-1, keepdim=True)
 
     # vector rejections
     # v = projection of b0 onto plane perpendicular to b1
@@ -176,18 +176,18 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
 
     n = torch.cross(v1, v2)
     nn = torch.cross(v1, n)
-    n /= torch.norm(n, dim=-1, keepdim=True)
-    nn /= torch.norm(nn, dim=-1, keepdim=True)
+    n = n / torch.norm(n, dim=-1, keepdim=True)
+    nn = nn / torch.norm(nn, dim=-1, keepdim=True)
 
-    n *= -torch.sin(t4123)
-    nn *= torch.cos(t4123)
+    n = n * (-torch.sin(t4123))
+    nn = nn * torch.cos(t4123)
 
     v3 = n + nn
-    v3 /= torch.norm(v3, dim=-1, keepdim=True)
-    v3 *= d14 * torch.sin(a412)
+    v3 = v3 / torch.norm(v3, dim=-1, keepdim=True)
+    v3 = v3 * d14 * torch.sin(a412)
 
-    v1 /= torch.norm(v1, dim=-1, keepdim=True)
-    v1 *= d14 * torch.cos(a412)
+    v1 = v1 / torch.norm(v1, dim=-1, keepdim=True)
+    v1 = v1 * d14 * torch.cos(a412)
 
     position = p1 + v3 - v1
 
@@ -225,7 +225,7 @@ def ic2xyz_nerf_torch(p1, p2, p3, d14, a412, t4123):
 
     bc = BC / torch.norm(BC, dim=-1, keepdim=True)
     n = torch.cross(AB, bc)
-    n /= torch.norm(n, dim=-1, keepdim=True)
+    n = n / torch.norm(n, dim=-1, keepdim=True)
 
     D2 = torch.concat(
         [
