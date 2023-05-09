@@ -134,6 +134,15 @@ class RealNVP(Flow):
             Initialize weights and bias of scaling networks to set the initial output value
         """
         super().__init__()
+        self.config = {'n_layers' : n_layers,
+                       'n_hidden' : n_hidden,
+                       'activation' : activation,
+                       'n_layers_scale' : n_layers_scale,
+                       'n_hidden_scale' : n_hidden_scale,
+                       'activation_scale' : activation_scale,
+                       'init_output_scale' : init_output_scale,
+                       **layer_args
+                       }
         if activation_scale is None:
             activation_scale = activation
         if n_layers_scale is None:
@@ -177,6 +186,7 @@ class RealNVP(Flow):
         )
         self.dim_in = [dim_L, dim_R]
         self.dim_out = [dim_L, dim_R]
+        
 
     def _forward(self, x):
         def lambda_sum(x):

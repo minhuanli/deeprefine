@@ -8,7 +8,7 @@ from deeprefine.protein.icconverter import ICConverter
 from deeprefine.protein.whiten import Whitener
 from deeprefine.utils import assert_numpy, assert_tensor, try_gpu
 
-# TODO: test the save and load of Sequential flow
+
 class SequentialFlow(Flow):
     def __init__(self, blocks):
         """
@@ -116,7 +116,7 @@ class BoltzmannGenerator(object):
 
         self.dim_in = dim_in
         self.dim_out = flow.dim_out
-    
+
     @property
     def device(self):
         return self.whitener.Twhiten.device
@@ -172,9 +172,9 @@ class BoltzmannGenerator(object):
         """
         z = assert_tensor(z)
         if self.prior == "normal":
-            E = self.dim_out * torch.log(torch.tensor(np.sqrt(temperature)).to(z)) + torch.sum(
-                z**2 / (2 * temperature), dim=1
-            )
+            E = self.dim_out * torch.log(
+                torch.tensor(np.sqrt(temperature)).to(z)
+            ) + torch.sum(z**2 / (2 * temperature), dim=1)
         elif self.prior == "lognormal":
             sample_z_normal = torch.log(z)
             E = torch.sum(sample_z_normal**2 / (2 * temperature), dim=1) + torch.sum(
@@ -315,4 +315,60 @@ def construct_bg(
     blocks.append(mflow)
     flow = SequentialFlow(blocks).to(device)
     bg = BoltzmannGenerator(flow, icconverter, whitener, energy_model, prior)
+    return bg
+
+
+def save_bg(bg, filepath):
+    """Save bg to a dictionary, without saving the energy model"""
+    fulldict = {}
+
+    # Save icconverter if exists
+    if bg.icconverter is not None:
+        fulldict["icconverter"] = bg.icconverter.to_dict()
+    # Save Whitener if exists
+    if bg.whitener is not None:
+        fulldict["whitener"] = bg.whitener.to_dict()
+
+    # Save flow in a hacky way
+    flowdict = {}
+    flowdict["n_realnvp"] = len(bg.flow) - 2
+    flowdict["realnvp_config"] = bg.flow[1].config
+    flowdict["state_dict"] = bg.flow.state_dict()
+
+    fulldict["flow"] = flowdict
+    fulldict["prior"] = bg.prior
+
+    import pickle
+
+    with open(filepath, "wb") as f:
+        pickle.dump(fulldict, f, pickle.HIGHEST_PROTOCOL)
+
+
+def load_bg(filepath, energy_model, device=try_gpu()):
+    import pickle
+
+    with open(filepath, "rb") as f:
+        fulldict = pickle.load(f)
+
+    if fulldict.get("icconverter") is None:
+        icconverter = None
+    else:
+        icconverter = ICConverter.from_dict(fulldict["icconverter"])
+
+    if fulldict.get("whitener") is None:
+        whitener = None
+    else:
+        whitener = Whitener.from_dict(fulldict["whitener"])
+
+    flowdict = fulldict["flow"]
+    bg = construct_bg(
+        icconverter,
+        whitener,
+        flowdict["n_realnvp"],
+        energy_model,
+        **flowdict["realnvp_config"],
+        prior=fulldict["prior"],
+        device=device,
+    )
+    bg.flow.load_state_dict(flowdict["state_dict"])
     return bg
