@@ -23,5 +23,6 @@ from deeprefine.utils.md import (
 from deeprefine.utils.types import (
     assert_numpy,
     assert_tensor,
+    assert_list,
     try_gpu
 )

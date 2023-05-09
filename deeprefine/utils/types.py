@@ -31,6 +31,14 @@ def assert_tensor(x, arr_type=None):
     return x
 
 
+def assert_list(a, length, dtype=int):
+    if isinstance(a, dtype):
+        a = [a] * length
+    elif isinstance(a, list):
+        assert len(a) == length
+    return a
+
+
 def try_gpu(i=0):
     if torch.cuda.device_count() >= i + 1:
         return torch.device(f"cuda:{i}")
