@@ -48,7 +48,7 @@ class Whitener(object):
 
         Parameters:
         -----------
-        X0 : array, [n_batch, n_feature]
+        X0 : array or Tensor, [n_batch, n_feature]
             Initial Data on which PCA will be computed.
         dim_cart_signal : int or None
             Number of cartesian indices in the features. By default treat all features in the same way

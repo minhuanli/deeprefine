@@ -1,7 +1,5 @@
-from pdbfixer import PDBFixer
 import mdtraj
 import numpy as np
-
 
 def prep_pdb(filename, outfile, pH=7.0, keepHOH=False, missingresidue="missres.log"):
     """
@@ -26,6 +24,7 @@ def prep_pdb(filename, outfile, pH=7.0, keepHOH=False, missingresidue="missres.l
     -------
     None
     """
+    from pdbfixer import PDBFixer
     fixer = PDBFixer(filename=filename)
     fixer.findMissingResidues()
     fixer.findMissingAtoms()
@@ -143,3 +142,18 @@ def fix_missingresidues(trajectory, record):
     residuesleft = np.setdiff1d(np.arange(topology.n_atoms), np.array(atom_slices))
     traj_new = trajectory.atom_slice(residuesleft)
     return traj_new
+
+def save_samples_to_pdb(samples, mdtraj_topology, filename=None, topology_fn=None):
+    '''
+    Save generated samples as a pdb file.
+    `samples`: array, (Nsamples, n_atoms*n_dim)
+    `mdtraj_topology`: an MDTraj Topology object of the molecular system
+    `filename=None`: str, output filename with extension (all MDTraj compatible formats)
+    '''
+    import mdtraj as md
+    trajectory = md.Trajectory(
+        samples.reshape(-1, mdtraj_topology.n_atoms, 3), mdtraj_topology)
+    if filename.split('.')[-1] == 'pdb':
+        trajectory.save_pdb(filename)
+    else:
+        trajectory.save(filename)

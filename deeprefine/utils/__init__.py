@@ -7,6 +7,8 @@ __all__ = [
     "assert_numpy",
     "assert_tensor",
     "try_gpu",
+    "assert_list",
+    "save_samples_to_pdb"
 ]
 
 from deeprefine.utils.io import (
@@ -14,6 +16,7 @@ from deeprefine.utils.io import (
     align_md,
     remove_hydrogens,
     fix_missingresidues,
+    save_samples_to_pdb
 )
 
 from deeprefine.utils.md import (

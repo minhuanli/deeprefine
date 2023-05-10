@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import DataLoader, RandomSampler
 
 from typing import Union
-
 from tqdm import tqdm
 
 from deeprefine.nn.flow.losses import MLlossNormal, KLloss
@@ -68,7 +67,7 @@ class MLTrainer(object):
                         MLloss=loss_np, memory=torch.cuda.memory_allocated() / 1e9
                     )
                     record.append(loss_np, torch.cuda.memory_allocated() / 1e9)
-            if epoch % checkpoint_epoch == 0:
+            if (epoch % checkpoint_epoch == 0) or (epoch == epochs-1):
                 save_bg(self.bg, checkpoint_name + f"_{epoch}.pkl")
         return record
 
@@ -184,6 +183,6 @@ class FlexibleTrainer(object):
                         klloss_np,
                         torch.cuda.memory_allocated() / 1e9,
                     )
-            if epoch % checkpoint_epoch == 0:
+            if (epoch % checkpoint_epoch == 0) or (epoch == epochs-1):
                 save_bg(self.bg, checkpoint_name + f"_{epoch}.pkl")
         return record
