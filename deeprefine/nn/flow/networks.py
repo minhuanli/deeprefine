@@ -6,9 +6,9 @@ from deeprefine.nn.flow.basics import Flow
 from deeprefine.nn.flow.invertible_blocks import SplitChannels, MergeChannels, RealNVP
 from deeprefine.protein.icconverter import ICConverter
 from deeprefine.protein.whiten import Whitener
+from deeprefine.protein.featurefreezer import FeatureFreezer
 from deeprefine.utils import assert_numpy, assert_tensor, try_gpu
 from deeprefine.nn.utils import count_parameters
-
 
 class SequentialFlow(Flow):
     def __init__(self, blocks):
@@ -94,10 +94,11 @@ class SequentialFlow(Flow):
 
 class BoltzmannGenerator(object):
     def __init__(
-        self, flow, icconverter=None, whitener=None, energy_model=None, prior="normal"
+        self, flow, icconverter=None, featurefreezer=None, whitener=None, energy_model=None, prior="normal"
     ):
         self.flow = flow
         self.icconverter = icconverter
+        self.featurefreezer = featurefreezer
         self.whitener = whitener
         self.energy_model = energy_model
         self.prior = prior
@@ -108,11 +109,17 @@ class BoltzmannGenerator(object):
                 dim_in == whitener.dim_out
             ), "dim_out of whitener must be equal to dim_in of flow!"
             dim_in = whitener.dim_in
+        
+        if featurefreezer is not None:
+            assert (
+                dim_in == featurefreezer.dim_out
+            ), "dim_out of featurefreezer must be equal to dim_in of whitener!"
+            dim_in = featurefreezer.dim_in
 
         if icconverter is not None:
             assert (
                 dim_in == icconverter.dim_out
-            ), "dim_out of iccoverter must be equal to dim_in of whitener or flow!"
+            ), "dim_out of iccoverter must be equal to dim_in of featurefreezer, whitener or flow!"
             dim_in = icconverter.dim_in
 
         self.dim_in = dim_in
@@ -132,6 +139,8 @@ class BoltzmannGenerator(object):
         """
         if self.icconverter is not None:
             x = self.icconverter.xyz2ic(x)
+        if self.featurefreezer is not None:
+            x = self.featurefreezer.forward(x)
         if self.whitener is not None:
             x = self.whitener.whiten(x)
         z, log_det_Jxz = self.flow(x)
@@ -148,6 +157,8 @@ class BoltzmannGenerator(object):
         x, log_det_Jzx = self.flow(z, inverse=True)
         if self.whitener is not None:
             x = self.whitener.blacken(x)
+        if self.featurefreezer is not None:
+            x = self.featurefreezer.backward(x)
         if self.icconverter is not None:
             x = self.icconverter.ic2xyz(x)
         return x, log_det_Jzx
@@ -158,6 +169,12 @@ class BoltzmannGenerator(object):
             print(
                 f"{self.icconverter.__class__.__name__:<15}: {str(self.icconverter.dim_in):>12}  ->  {str(self.icconverter.dim_out):>12}"
             )
+
+        if self.featurefreezer is not None:
+            print(
+                f"{self.featurefreezer.__class__.__name__:<15}: {str(self.featurefreezer.dim_in):>12}  ->  {str(self.featurefreezer.dim_out):>12}"
+            )
+
         if self.whitener is not None:
             print(
                 f"{self.whitener.__class__.__name__:<15}: {str(self.whitener.dim_in):>12}  ->  {str(self.whitener.dim_out):>12}"
@@ -280,6 +297,7 @@ class BoltzmannGenerator(object):
 
 def construct_bg(
     icconverter,
+    featurefreezer,
     whitener,
     n_realnvp=8,
     energy_model=None,
@@ -316,7 +334,7 @@ def construct_bg(
     mflow = MergeChannels(whitener.dim_out, nchannels=2)
     blocks.append(mflow)
     flow = SequentialFlow(blocks).to(device)
-    bg = BoltzmannGenerator(flow, icconverter, whitener, energy_model, prior)
+    bg = BoltzmannGenerator(flow, icconverter, featurefreezer, whitener, energy_model, prior)
     return bg
 
 
@@ -327,6 +345,11 @@ def save_bg(bg, filepath):
     # Save icconverter if exists
     if bg.icconverter is not None:
         fulldict["icconverter"] = bg.icconverter.to_dict()
+
+    # Save featurefreezer if exists
+    if bg.featurefreezer is not None:
+        fulldict["featurefreezer"] = bg.featurefreezer.to_dict()
+
     # Save Whitener if exists
     if bg.whitener is not None:
         fulldict["whitener"] = bg.whitener.to_dict()
@@ -357,6 +380,11 @@ def load_bg(filepath, energy_model, device=try_gpu()):
     else:
         icconverter = ICConverter.from_dict(fulldict["icconverter"])
 
+    if fulldict.get("featurefreezer") is None:
+        featurefreezer = None
+    else:
+        featurefreezer = FeatureFreezer.from_dict(fulldict["featurefreezer"])
+
     if fulldict.get("whitener") is None:
         whitener = None
     else:
@@ -365,6 +393,7 @@ def load_bg(filepath, energy_model, device=try_gpu()):
     flowdict = fulldict["flow"]
     bg = construct_bg(
         icconverter,
+        featurefreezer,
         whitener,
         flowdict["n_realnvp"],
         energy_model,
