@@ -66,7 +66,7 @@ class MLTrainer(object):
                     progress_bar.set_postfix(
                         MLloss=loss_np, memory=torch.cuda.memory_allocated() / 1e9
                     )
-                    record.append(loss_np, torch.cuda.memory_allocated() / 1e9)
+                    record.append([loss_np, torch.cuda.memory_allocated() / 1e9])
             if (epoch % checkpoint_epoch == 0) or (epoch == epochs-1):
                 save_bg(self.bg, checkpoint_name + f"_{epoch}.pkl")
         return record
@@ -178,10 +178,12 @@ class FlexibleTrainer(object):
                         memory=torch.cuda.memory_allocated() / 1e9,
                     )
                     record.append(
+                        [
                         loss_np,
                         mlloss_np,
                         klloss_np,
                         torch.cuda.memory_allocated() / 1e9,
+                        ]
                     )
             if (epoch % checkpoint_epoch == 0) or (epoch == epochs-1):
                 save_bg(self.bg, checkpoint_name + f"_{epoch}.pkl")
