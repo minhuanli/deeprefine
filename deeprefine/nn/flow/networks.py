@@ -7,6 +7,7 @@ from deeprefine.nn.flow.invertible_blocks import SplitChannels, MergeChannels, R
 from deeprefine.protein.icconverter import ICConverter
 from deeprefine.protein.whiten import Whitener
 from deeprefine.utils import assert_numpy, assert_tensor, try_gpu
+from deeprefine.nn.utils import count_parameters
 
 
 class SequentialFlow(Flow):
@@ -162,6 +163,7 @@ class BoltzmannGenerator(object):
                 f"{self.whitener.__class__.__name__:<15}: {str(self.whitener.dim_in):>12}  ->  {str(self.whitener.dim_out):>12}"
             )
         self.flow.summarize()
+        print(f"{'Number of parameters':<15}: {count_parameters(self.flow):>12}")
 
     def energy_z(self, z, temperature=1.0):
         """Calculate the effective energy of z in latent sapce given a prior
