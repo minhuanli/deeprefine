@@ -143,7 +143,7 @@ def fix_missingresidues(trajectory, record):
     traj_new = trajectory.atom_slice(residuesleft)
     return traj_new
 
-def save_samples_to_pdb(samples, mdtraj_topology, filename=None, topology_fn=None):
+def save_samples_to_pdb(samples, mdtraj_topology, filename=None):
     '''
     Save generated samples as a pdb file.
     `samples`: array, (Nsamples, n_atoms*n_dim)
