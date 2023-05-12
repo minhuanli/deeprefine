@@ -12,7 +12,10 @@ class FeatureFreezer(object):
 
     Support two modes to determine frozen features:
     1. Mannually input the feature indices, like you know which are bond length features
-    2. Automatically freeze features with std/mean < 0.05, never kicking the cartesian signals
+    2. Automatically freeze features following:
+        a. never freeze the cartesian signals
+        b. for distance signals, freeze those with std/mean < 0.05
+        c. for angles with vi = (sin, cos) features, freeze those with c = |sum_vi|/sum|vi| > 0.996, equal to std of 5 degree
 
     Parameters:
     -----------
@@ -22,11 +25,27 @@ class FeatureFreezer(object):
     frozen_indices : array, [n_frozen_features,] or None
         indices of features you want to freeze. If None, use automatic cutoff
 
-    cutoff : float
-        cutoff of std/mean to determine frozen features automatically
-    """
+    bond_idx: array
+        indices according to bond length features
 
-    def __init__(self, X0, frozen_indices=None, cutoff=0.05, dim_cart_signal=None, from_dict=False):
+    cosangle_idx: array
+        indices according to cos angle (including torsions) features
+
+    singangle_idx: array
+        indices according to sin angle (including torsions) features
+
+    """
+    def __init__(
+        self,
+        X0,
+        frozen_indices=None,
+        bond_idx=None,
+        cosangle_idx=None,
+        sinangle_idx=None,
+        dist_cutoff=0.05,
+        angle_cuoff=0.996,
+        from_dict=False,
+    ):
         if from_dict:
             self.dim_in = None
             self.dim_out = None
@@ -39,19 +58,36 @@ class FeatureFreezer(object):
                 self.frozen_idx = frozen_indices
                 self.cutoff = None
             else:
-                self.cutoff = cutoff
-                if dim_cart_signal is not None:
-                    abs_mean = torch.abs(torch.mean(X0[:, dim_cart_signal:], axis=0))
-                    std = torch.std(X0[: dim_cart_signal:], axis=0)
-                    self.frozen_idx = dim_cart_signal + assert_numpy(
-                        torch.argwhere(std / abs_mean < cutoff).reshape(-1)
+                self.cutoff = [dist_cutoff, angle_cuoff]
+                # get bond frozen features
+                bond_features = X0[:, bond_idx]
+                bond_abs_mean = torch.abs(torch.mean(bond_features, axis=0))
+                bond_std = torch.std(bond_features, axis=0)
+                bond_frozen_idx = bond_idx[
+                    assert_numpy(
+                        torch.argwhere(bond_std / bond_abs_mean < dist_cutoff).reshape(
+                            -1
+                        )
                     )
-                else:
-                    abs_mean = torch.abs(torch.mean(X0, axis=0))
-                    std = torch.std(X0, axis=0)
-                    self.frozen_idx = assert_numpy(
-                        torch.argwhere(std / abs_mean < cutoff).reshape(-1)
+                ]
+                # get angle frozen features
+                cosangle_features = X0[:, cosangle_idx]
+                sinangle_features = X0[:, sinangle_idx]
+                c_features = (
+                    torch.sqrt(
+                        torch.sum(cosangle_features, dim=0) ** 2
+                        + torch.sum(sinangle_features, dim=0) ** 2
                     )
+                    / X0.shape[0]
+                )
+                _angle_frozen_idx = assert_numpy(
+                    torch.argwhere(c_features > angle_cuoff).reshape(-1)
+                )
+                cos_frozen_idx = cosangle_idx[_angle_frozen_idx]
+                sin_frozen_idx = sinangle_idx[_angle_frozen_idx]
+                self.frozen_idx = np.concatenate(
+                    [bond_frozen_idx, cos_frozen_idx, sin_frozen_idx]
+                )
             self.dim_out = self.dim_in - len(self.frozen_idx)
             self.keep_idx = np.setdiff1d(np.arange(self.dim_in), self.frozen_idx)
             self.freeze_mean = torch.mean(X0[:, self.frozen_idx], axis=0).to(try_gpu())
@@ -59,14 +95,14 @@ class FeatureFreezer(object):
     def forward(self, X):
         """drop frozen features"""
         return X[:, self.keep_idx]
-    
+
     def backward(self, Z):
         """fill in the frozen features with saved means"""
         X = torch.zeros([Z.shape[0], self.dim_in]).to(Z)
         X[:, self.keep_idx] = Z
         X[:, self.frozen_idx] = self.freeze_mean
         return X
-    
+
     @classmethod
     def from_dict(cls, d):
         ff = cls(None, from_dict=True)
@@ -85,5 +121,3 @@ class FeatureFreezer(object):
         d["frozen_idx"] = self.frozen_idx
         d["freeze_mean"] = assert_numpy(self.freeze_mean)
         return d
-    
-
