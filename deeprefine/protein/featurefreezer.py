@@ -12,7 +12,7 @@ class FeatureFreezer(object):
 
     Support two modes to determine frozen features:
     1. Mannually input the feature indices, like you know which are bond length features
-    2. Automatically freeze features with std/mean < 0.05
+    2. Automatically freeze features with std/mean < 0.05, never kicking the cartesian signals
 
     Parameters:
     -----------
@@ -26,7 +26,7 @@ class FeatureFreezer(object):
         cutoff of std/mean to determine frozen features automatically
     """
 
-    def __init__(self, X0, frozen_indices=None, cutoff=0.05, from_dict=False):
+    def __init__(self, X0, frozen_indices=None, cutoff=0.05, dim_cart_signal=None, from_dict=False):
         if from_dict:
             self.dim_in = None
             self.dim_out = None
@@ -40,11 +40,18 @@ class FeatureFreezer(object):
                 self.cutoff = None
             else:
                 self.cutoff = cutoff
-                abs_mean = torch.abs(torch.mean(X0, axis=0))
-                std = torch.std(X0, axis=0)
-                self.frozen_idx = assert_numpy(
-                    torch.argwhere(std / abs_mean < cutoff).reshape(-1)
-                )
+                if dim_cart_signal is not None:
+                    abs_mean = torch.abs(torch.mean(X0[:, dim_cart_signal:], axis=0))
+                    std = torch.std(X0[: dim_cart_signal:], axis=0)
+                    self.frozen_idx = dim_cart_signal + assert_numpy(
+                        torch.argwhere(std / abs_mean < cutoff).reshape(-1)
+                    )
+                else:
+                    abs_mean = torch.abs(torch.mean(X0, axis=0))
+                    std = torch.std(X0, axis=0)
+                    self.frozen_idx = assert_numpy(
+                        torch.argwhere(std / abs_mean < cutoff).reshape(-1)
+                    )
             self.dim_out = self.dim_in - len(self.frozen_idx)
             self.keep_idx = np.setdiff1d(np.arange(self.dim_in), self.frozen_idx)
             self.freeze_mean = torch.mean(X0[:, self.frozen_idx], axis=0).to(try_gpu())
