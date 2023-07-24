@@ -38,7 +38,7 @@ class ArgumentParser(argparse.ArgumentParser):
             "--temperature",
             default=290,
             type=float,
-            help="Temperature of the simulation system, in Kelvin",
+            help="Temperature of the simulation system, in Kelvin, default 290",
         )
 
         self.add_argument(
@@ -46,7 +46,7 @@ class ArgumentParser(argparse.ArgumentParser):
             "--eqtime",
             default=1,
             type=float,
-            help="Time to simiulate for equillibration before production, in ns",
+            help="Time to simiulate for equillibration before production, in ns, default 1",
         )
 
         self.add_argument(
@@ -54,21 +54,21 @@ class ArgumentParser(argparse.ArgumentParser):
             "--prtime",
             default=100,
             type=float,
-            help="Time to simulate for production, in ns",
+            help="Time to simulate for production, in ns, default 100",
         )
 
         self.add_argument(
             "--reportstep",
             default=0.1,
             type=float,
-            help="Time between two state report, in ns",
+            help="Time between two state report, in ns, default 0.1",
         )
 
         self.add_argument(
             "--recordstep",
             default=0.01,
             type=float,
-            help="Time between two state recordings in production run, in ns",
+            help="Time between two state recordings in production run, in ns, default 0.01",
         )
 
         self.add_argument(
@@ -76,7 +76,7 @@ class ArgumentParser(argparse.ArgumentParser):
             "--stepsize",
             type=float,
             default=0.002,
-            help="The time of each MD step, in unit of picosecond",
+            help="The time of each MD step, in unit of picosecond, default 0.002",
         )
 
         self.add_argument(
