@@ -7,7 +7,11 @@
 
 module load gcc python
 module load cuda
-mamba activate bggpu
+
+source ~/.bashrc
+sleep 1
+/arc/home/gw/software/mambaforge/condabin/mamba activate bggpu
+sleep 1
 
 BASE_DIR=/scratch/pr-kdd-1/gw/deeprefine/
 DATA_DIR=${BASE_DIR}/data/
