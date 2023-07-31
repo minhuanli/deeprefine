@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l walltime=1:00:00,select=1:ncpus=4:ngpus=1:mem=64gb
+#PBS -l walltime=1:00:00,select=1:ncpus=10:ngpus=1:mem=64gb
 #PBS -N 220230731_bg
 #PBS -A pr-kdd-1-gpu
 
@@ -9,9 +9,23 @@ module load gcc python
 module load cuda
 mamba activate bggpu
 
-WORK_DIR='/scratch/pr-kdd-1/gw/deeprefine/results'
-cd ${WORK_DIR}src/physics_aware_cryoem
-NEW_RES_DIR='20230731_bg/'
-FULL_RES_PATH=${WORK_DIR}results/${NEW_RES_DIR}
+BASE_DIR=/scratch/pr-kdd-1/gw/deeprefine/
+DATA_DIR=${BASE_DIR}/data/
+W_DIR=${BASE_DIR}/deeprefine
+cd ${W_DIR}
+RESULTS_DIR=${BASE_DIR}/results/20230731
 
-python main.py -o ${FULL_RES_PATH} -lr 0.0001 -qconc 0.0 -nnn 50 -np 50 -ne 1000 -sp ${FULL_RES_PATH}/simulate_data_params.yaml -ip ${FULL_RES_PATH}/inference_params.yaml -obs_rot True
+cd ${BASE_DIR}
+
+python deeprefine/main.py --base_dir $BASE_DIR \
+--traj_file ${DATA_DIR}/1BTI/1bti_implicit_traj.h5 \
+--pdb_file ${DATA_DIR}/1BTI/1bti_fixed.pdb \
+--ml_checkpoint_prefix ${RESULTS_DIR}/mltrain_ \
+--final_ml_checkpoint_prefix ${RESULTS_DIR}/mltrain__39.pkl \
+--kl_checkpoint_prefix ${RESULTS_DIR}/kltrain_ \
+--final_kl_checkpoint_fname ${RESULTS_DIR}/kltrain_11_2.pkl
+--n_batch 500 \
+--temp 300.0 \
+
+
+
