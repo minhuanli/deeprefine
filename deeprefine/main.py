@@ -4,6 +4,8 @@ import numpy as np
 from openmm import unit
 import os
 
+
+# TODO: add arg parse for hard coded paths
 def train():
 
   base_dir = '/scratch/pr-kdd-1/gw/deeprefine'
