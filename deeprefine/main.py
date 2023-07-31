@@ -50,7 +50,8 @@ def main():
                       default='example',
                       help="kltrainer checkpoint prefix",
                       )
-  bg, report = train(parser.base, parser.traj, parser.pdb, parser.temp, parser.ml, parser.fml, parser.kl)
+  args = parser.parse_args()
+  bg, report = train(args.base_dir, args.traj_file, args.pdb_file, args.temp, args.ml_checkpoint_prefix, args.final_ml_checkpoint_fname, args.kl_checkpoint_prefix)
 
   parser.add_argument("-fkl",
                       "--final_kl_checkpoint_fname",
@@ -64,8 +65,8 @@ def main():
                       default=1,
                       help="number of batch samples",
                       )
-
-  samples_x, samples_e, log_prob_z, log_prob_e_montecarlo = generate(parser.base, parser.pdb, parser.fkl, parser.nb, parser.t)
+  args = parser.parse_args()
+  samples_x, samples_e, log_prob_z, log_prob_e_montecarlo = generate(args.base_dir, args.pdb_file, args.final_kl_checkpoint_fname, args.n_batch, args.temp)
 
 def train(base_dir, traj_file, pdb_file, temp, ml_checkpoint_prefix, final_checkpoint_fname, kl_checkpoint_prefix):
 
