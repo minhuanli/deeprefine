@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l walltime=3:00:00,select=1:ncpus=4:ngpus=1:mem=16gb
+#PBS -I
+#PBS -q interactive_gpu
+#PBS -N job_name
+#PBS -A pr-kdd-1-gpu
+
+##################
+
+mamba activate bggpu
+cd /scratch/pr-kdd-1/gw/deeprefine
+
