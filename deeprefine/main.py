@@ -88,9 +88,8 @@ def predict():
   samples_x, _ = bg.TzxJ(samples_z)
   samples_e = torch.from_numpy(dr.assert_numpy(bg.energy_model.energy(samples_x)))
   temp = 300
-  log_prob_e_unscaled = -samples_e/temp
-  zum_over_all_ztates = (log_prob_e_unscaled.exp()).sum()
-  log_prob_e = log_prob_e_unscaled - zum_over_all_ztates
-
-  return samples_x, samples_e, log_prob_z, log_prob_e
+  log_prob_e_montecarlo_unscaled = -samples_e/temp
+  zum_over_all_ztates = (log_prob_e_montecarlo_unscaled.exp()).sum()
+  log_prob_e_montecarlo = log_prob_e_montecarlo_unscaled - zum_over_all_ztates
+  return samples_x, samples_e, log_prob_z, log_prob_e_montecarlo
 
