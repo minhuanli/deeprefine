@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -l walltime=1:00:00,select=1:ncpus=4:ngpus=1:mem=64gb
+#PBS -N 220230731_bg
+#PBS -A pr-kdd-1-gpu
+
+##################
+
+module load gcc python
+module load cuda
+mamba activate bggpu
+
+WORK_DIR='/scratch/pr-kdd-1/gw/deeprefine/results'
+cd ${WORK_DIR}src/physics_aware_cryoem
+NEW_RES_DIR='20230731_bg/'
+FULL_RES_PATH=${WORK_DIR}results/${NEW_RES_DIR}
+
+python main.py -o ${FULL_RES_PATH} -lr 0.0001 -qconc 0.0 -nnn 50 -np 50 -ne 1000 -sp ${FULL_RES_PATH}/simulate_data_params.yaml -ip ${FULL_RES_PATH}/inference_params.yaml -obs_rot True

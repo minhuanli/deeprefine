@@ -73,14 +73,15 @@ def train():
           print(V, '\t>\t', E, flush=True)
 
 
-def predict():
+def generate():
   base_dir = '/scratch/pr-kdd-1/gw/deeprefine'
   pdb_file = os.path.join(base_dir, "data/1BTI/1bti_fixed.pdb")
   _, mm_1bti = dr.setup_protein(pdb_file, 300,
                                    implicit_solvent=True,
                                    platform='CUDA',
                                    length_scale=unit.nanometer)
-  bg = dr.load_bg(os.path.join(base_dir, "results/20230731/kltrain_11_2.pkl"), mm_1bti)
+  final_checkpoint = os.path.join(base_dir, "results/20230731/kltrain_11_2.pkl")
+  bg = dr.load_bg(final_checkpoint, mm_1bti)
   dist_z = torch.distributions.MultivariateNormal(torch.zeros(bg.dim_out).to('cuda'), torch.diag_embed(torch.ones(bg.dim_out).to('cuda')))
   n_batch = 500
   samples_z = dist_z.sample((n_batch,))
@@ -93,3 +94,6 @@ def predict():
   log_prob_e_montecarlo = log_prob_e_montecarlo_unscaled - zum_over_all_ztates
   return samples_x, samples_e, log_prob_z, log_prob_e_montecarlo
 
+if __name__ == '__main__':
+  train()
+  generate()
