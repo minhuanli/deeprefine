@@ -26,12 +26,6 @@ def main():
                       default='example',
                       help="trajectory file",
                       )
-  parser.add_argument("-t",
-                      "--temp",
-                      type=float,
-                      default=300.0,
-                      help="temperature",
-                      )
   parser.add_argument("-ml",
                       "--ml_checkpoint_prefix",
                       type=str,
@@ -64,11 +58,11 @@ def main():
                       )
   args = parser.parse_args()
 
-  bg, report = train(args.base_dir, args.traj_file, args.pdb_file, args.temp, args.ml_checkpoint_prefix, args.final_ml_checkpoint_fname, args.kl_checkpoint_prefix)
+  bg, report = train(args.traj_file, args.pdb_file, args.temp, args.ml_checkpoint_prefix, args.final_ml_checkpoint_fname, args.kl_checkpoint_prefix)
 
-  samples_x, samples_e, log_prob_z, log_prob_e_montecarlo = generate(args.base_dir, args.pdb_file, args.final_kl_checkpoint_fname, args.n_batch, args.temp)
+  samples_x, samples_e, log_prob_z, log_prob_e_montecarlo = generate(args.pdb_file, args.final_kl_checkpoint_fname, args.n_batch)
 
-def train(base_dir, traj_file, pdb_file, temp, ml_checkpoint_prefix, final_checkpoint_fname, kl_checkpoint_prefix):
+def train(traj_file, pdb_file, temp, ml_checkpoint_prefix, final_checkpoint_fname, kl_checkpoint_prefix):
 
   # base_dir = '/scratch/pr-kdd-1/gw/deeprefine'
 
@@ -139,22 +133,18 @@ def train(base_dir, traj_file, pdb_file, temp, ml_checkpoint_prefix, final_check
   return bg, report
 
 
-def generate(base_dir, pdb_file, final_kl_checkpoint_fname, n_batch, temp):
-  # base_dir = '/scratch/pr-kdd-1/gw/deeprefine'
-  # pdb_file = os.path.join(base_dir, "data/1BTI/1bti_fixed.pdb")
+def generate(pdb_file, final_kl_checkpoint_fname, n_batch):
   _, mm_1bti = dr.setup_protein(pdb_file, 300,
                                    implicit_solvent=True,
                                    platform='CUDA',
                                    length_scale=unit.nanometer)
-  # final_kl_checkpoint_fname = os.path.join(base_dir, "results/20230731/kltrain_11_2.pkl")
   bg = dr.load_bg(final_kl_checkpoint_fname, mm_1bti)
   dist_z = torch.distributions.MultivariateNormal(torch.zeros(bg.dim_out).to('cuda'), torch.diag_embed(torch.ones(bg.dim_out).to('cuda')))
-  # n_batch = 500
   samples_z = dist_z.sample((n_batch,))
   log_prob_z = dist_z.log_prob(samples_z)
   samples_x, _ = bg.TzxJ(samples_z)
   samples_e = torch.from_numpy(dr.assert_numpy(bg.energy_model.energy(samples_x)))
-  # temp = 300
+  temp = 1
   log_prob_e_montecarlo_unscaled = -samples_e/temp
   zum_over_all_ztates = (log_prob_e_montecarlo_unscaled.exp()).sum()
   log_prob_e_montecarlo = log_prob_e_montecarlo_unscaled - zum_over_all_ztates

@@ -30,7 +30,7 @@ python main.py --base_dir $BASE_DIR \
 --kl_checkpoint_prefix ${RESULTS_DIR}/kltrain_ \
 --final_kl_checkpoint_fname ${RESULTS_DIR}/kltrain_11_2.pkl \
 --n_batch 500 \
---temp 300.0 \
+
 
 
 
