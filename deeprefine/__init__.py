@@ -4,6 +4,7 @@ from deeprefine import energy
 from deeprefine import geometry
 from deeprefine import protein
 from deeprefine import nn
+from deeprefine import main
 
 # Top level API
 from deeprefine.energy.openmm import setup_protein

@@ -5,6 +5,16 @@ from openmm import unit
 import os
 import argparse
 
+
+def quick_paths():
+  base_dir = '/scratch/pr-kdd-1/gw/deeprefine'
+  traj_file = os.path.join(base_dir, "data/1BTI/1bti_implicit_traj.h5")
+  pdb_file = os.path.join(base_dir, "data/1BTI/1bti_fixed.pdb")
+  final_checkpoint_fname = os.path.join(base_dir, "results/20230731/mltrain__39.pkl")
+  temp = 300.0
+  final_kl_checkpoint_fname = os.path.join(base_dir, "results/20230731_argparse/kltrain_12_3.pkl")
+  return base_dir, traj_file, pdb_file, final_checkpoint_fname, temp, final_kl_checkpoint_fname
+
 def main():
   # TODO: add arg parse for hard coded paths
   parser = argparse.ArgumentParser()
@@ -64,19 +74,17 @@ def main():
                       )
   args = parser.parse_args()
 
-  bg, mm_pdb, X0 = setup_train(args.traj_file, args.pdb_file, args.temp)
+  bg, mm_pdb, X0, top = setup_train(args.traj_file, args.pdb_file, args.temp)
   bg, report = train(bg, mm_pdb, X0, args.ml_checkpoint_prefix, args.final_ml_checkpoint_fname, args.kl_checkpoint_prefix)
 
-  # bg, _ = load_bg(pdb_file, final_kl_checkpoint_fname, temp)
-  samples_x, samples_e, log_prob_z, log_prob_e_montecarlo = generate(bg, args.n_batch, args.temp)
+  # base_dir, traj_file, pdb_file, final_checkpoint_fname, temp, final_kl_checkpoint_fname = quick_paths()
+  # bg, _ = load_checkpoint(pdb_file, final_kl_checkpoint_fname, temp)
   atomic_states = encode(bg, X0)
 
+  samples_z, samples_x, samples_e, log_prob_z, log_prob_e_montecarlo = generate(bg, args.n_batch, [0])
+  dr.utils.save_samples_to_pdb(samples_x.detach().cpu(), top, os.path.join(args.base_dir, 'results/20230731_argparse/decoded_samples.pdb'))
+
 def setup_train(traj_file, pdb_file, temp):
-  # base_dir = '/scratch/pr-kdd-1/gw/deeprefine'
-
-  # traj_file = os.path.join(base_dir, "data/1BTI/1bti_implicit_traj.h5")
-  # pdb_file = os.path.join(base_dir, "data/1BTI/1bti_fixed.pdb")
-
   sim_x, top = dr.utils.align_md(traj_file, shuffle=True, ref_pdb=pdb_file)
   top2, mm_pdb = dr.setup_protein(pdb_file, temp,
                                    implicit_solvent=True,
@@ -105,7 +113,7 @@ def setup_train(traj_file, pdb_file, temp):
                        n_realnvp=8, **realnvp_args, prior='normal')
   bg.summarize()
   X0 = torch.tensor(sim_x, dtype=torch.float32)
-  return bg, mm_pdb, X0
+  return bg, mm_pdb, X0, top
 
 def train(bg, mm_pdb, X0, ml_checkpoint_prefix, final_checkpoint_fname, kl_checkpoint_prefix):
   optim = torch.optim.Adam(bg.flow.parameters(), lr=0.001)
@@ -116,7 +124,6 @@ def train(bg, mm_pdb, X0, ml_checkpoint_prefix, final_checkpoint_fname, kl_check
                                    checkpoint_epoch=4,
                                    checkpoint_name=ml_checkpoint_prefix)
 
-  # final_checkpoint_fname = os.path.join(base_dir, "results/20230731/mltrain__39.pkl")
   bg = dr.load_bg(final_checkpoint_fname, mm_pdb)
   optim2 = torch.optim.Adam(bg.flow.parameters(), lr=0.0001)
   kltrainer = dr.nn.flow.FlexibleTrainer(bg, optim2)
@@ -142,7 +149,7 @@ def train(bg, mm_pdb, X0, ml_checkpoint_prefix, final_checkpoint_fname, kl_check
           print(V, '\t>\t', E, flush=True)
   return bg, report, X0
 
-def load_bg(pdb_file, final_kl_checkpoint_fname, temp):
+def load_checkpoint(pdb_file, final_kl_checkpoint_fname, temp):
   _, mm_pdb = dr.setup_protein(pdb_file, temp,
                                    implicit_solvent=True,
                                    platform='CUDA',
@@ -150,9 +157,14 @@ def load_bg(pdb_file, final_kl_checkpoint_fname, temp):
   bg = dr.load_bg(final_kl_checkpoint_fname, mm_pdb)
   return bg, mm_pdb
 
-def generate(bg, n_batch):
+def generate(bg, n_batch, idx=[]):
   dist_z = torch.distributions.MultivariateNormal(torch.zeros(bg.dim_out).to('cuda'), torch.diag_embed(torch.ones(bg.dim_out).to('cuda')))
   samples_z = dist_z.sample((n_batch,))
+  if len(idx) > 0:
+    samples_z_sparse = torch.zeros_like(samples_z)
+    for i in idx:
+      samples_z_sparse[:,i] = samples_z[:,i]
+    samples_z = samples_z_sparse
   log_prob_z = dist_z.log_prob(samples_z)
   samples_x, _ = bg.TzxJ(samples_z)
   samples_e = torch.from_numpy(dr.assert_numpy(bg.energy_model.energy(samples_x)))
@@ -160,10 +172,10 @@ def generate(bg, n_batch):
   log_prob_e_montecarlo_unscaled = -samples_e/temp
   zum_over_all_ztates = (log_prob_e_montecarlo_unscaled.exp()).sum()
   log_prob_e_montecarlo = log_prob_e_montecarlo_unscaled - zum_over_all_ztates
-  return samples_x, samples_e, log_prob_z, log_prob_e_montecarlo
+  return samples_z, samples_x, samples_e, log_prob_z, log_prob_e_montecarlo
 
 def encode(bg, X0):
-  # bg, _ = load_bg(pdb_file, final_kl_checkpoint_fname, temp)
+  # bg, _ = load_checkpoint(pdb_file, final_kl_checkpoint_fname, temp)
   n_batch = len(X0)
   n_atom = X0.shape[-1]/3
   atomic_states = bg.TxzJ(X0.to('cuda'))[0].reshape(n_batch, bg.dim_out // 3, 3)
