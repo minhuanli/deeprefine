@@ -7,7 +7,7 @@ import argparse
 
 
 def quick_paths():
-  base_dir = '/scratch/pr-kdd-1/gw/deeprefine'
+  base_dir = '/Users/gw/repos/deeprefine' # #'/scratch/pr-kdd-1/gw/deeprefine'
   traj_file = os.path.join(base_dir, "data/1BTI/1bti_implicit_traj.h5")
   pdb_file = os.path.join(base_dir, "data/1BTI/1bti_fixed.pdb")
   final_checkpoint_fname = os.path.join(base_dir, "results/20230731/mltrain__39.pkl")
@@ -86,9 +86,10 @@ def main():
 
 def setup_train(traj_file, pdb_file, temp):
   sim_x, top = dr.utils.align_md(traj_file, shuffle=True, ref_pdb=pdb_file)
+  sim_x = sim_x[:3]
   top2, mm_pdb = dr.setup_protein(pdb_file, temp,
                                    implicit_solvent=True,
-                                   platform='CUDA',
+                                   platform='CPU',
                                    length_scale=unit.nanometer)
 
   icconverter = dr.ICConverter(top, vec_angles=True)
@@ -157,8 +158,9 @@ def load_checkpoint(pdb_file, final_kl_checkpoint_fname, temp):
   bg = dr.load_bg(final_kl_checkpoint_fname, mm_pdb)
   return bg, mm_pdb
 
-def generate(bg, n_batch, idx=[]):
-  dist_z = torch.distributions.MultivariateNormal(torch.zeros(bg.dim_out).to('cuda'), torch.diag_embed(torch.ones(bg.dim_out).to('cuda')))
+def generate(bg, n_batch, idx=[], dist_z=None):
+  if dist_z is None:
+    dist_z = torch.distributions.MultivariateNormal(torch.zeros(bg.dim_out).to('cuda'), torch.diag_embed(torch.ones(bg.dim_out).to('cuda')))
   samples_z = dist_z.sample((n_batch,))
   if len(idx) > 0:
     samples_z_sparse = torch.zeros_like(samples_z)
@@ -177,9 +179,9 @@ def generate(bg, n_batch, idx=[]):
 def encode(bg, X0):
   # bg, _ = load_checkpoint(pdb_file, final_kl_checkpoint_fname, temp)
   n_batch = len(X0)
-  n_atom = X0.shape[-1]/3
-  atomic_states = bg.TxzJ(X0.to('cuda'))[0].reshape(n_batch, bg.dim_out // 3, 3)
-  return atomic_states
+  n_atom = X0.shape[-1]//3
+  latent_states = bg.TxzJ(X0.to('cuda'))[0].reshape(n_batch, bg.dim_out // 3, 3)
+  return latent_states
 
 
 if __name__ == '__main__':
