@@ -18,13 +18,17 @@ def assert_numpy(x, arr_type=None):
         x = x.astype(arr_type)
     return x
 
+def try_gpu(i=0):
+    if torch.cuda.device_count() >= i + 1:
+        return torch.device(f"cuda:{i}")
+    return torch.device("cpu")
 
-def assert_tensor(x, arr_type=None):
+def assert_tensor(x, arr_type=None, device=try_gpu()):
     if isinstance(x, np.ndarray):
-        x = torch.tensor(x, device=try_gpu())
+        x = torch.tensor(x, device=device)
     if is_list_or_tuple(x):
         x = np.array(x)
-        x = torch.tensor(x, device=try_gpu())
+        x = torch.tensor(x, device=device)
     assert isinstance(x, torch.Tensor)
     if arr_type is not None:
         x = x.to(arr_type)
@@ -37,9 +41,3 @@ def assert_list(a, length, dtype=int):
     elif isinstance(a, list):
         assert len(a) == length
     return a
-
-
-def try_gpu(i=0):
-    if torch.cuda.device_count() >= i + 1:
-        return torch.device(f"cuda:{i}")
-    return torch.device("cpu")
