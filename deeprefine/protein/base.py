@@ -91,7 +91,7 @@ def torsion_torch(x1, x2, x3, x4, degrees=False):
     # angle between v and w in a plane is the torsion angle
     # v and w may not be normalized but that's fine since tan is y/x
     x = torch.sum(v * w, dim=-1)
-    b1xv = torch.cross(b1, v)
+    b1xv = torch.linalg.cross(b1, v)
     y = torch.sum(b1xv * w, dim=-1)
     if degrees:
         return np.float32(180.0 / np.pi) * torch.atan2(y, x)
@@ -174,8 +174,8 @@ def ic2xyz_torch(p1, p2, p3, d14, a412, t4123):
     v1 = p1 - p2
     v2 = p1 - p3
 
-    n = torch.cross(v1, v2)
-    nn = torch.cross(v1, n)
+    n = torch.linalg.cross(v1, v2)
+    nn = torch.linalg.cross(v1, n)
     n = n / torch.norm(n, dim=-1, keepdim=True)
     nn = nn / torch.norm(nn, dim=-1, keepdim=True)
 
@@ -224,7 +224,7 @@ def ic2xyz_nerf_torch(p1, p2, p3, d14, a412, t4123):
     AB = p2 - p3
 
     bc = BC / torch.norm(BC, dim=-1, keepdim=True)
-    n = torch.cross(AB, bc)
+    n = torch.linalg.cross(AB, bc)
     n = n / torch.norm(n, dim=-1, keepdim=True)
 
     D2 = torch.concat(
@@ -235,7 +235,7 @@ def ic2xyz_nerf_torch(p1, p2, p3, d14, a412, t4123):
         ],
         dim=-1,
     )  # [..., 3]
-    M = torch.stack([bc, torch.cross(n, bc), n], dim=-1)  # [..., 3, 3]
+    M = torch.stack([bc, torch.linalg.cross(n, bc), n], dim=-1)  # [..., 3, 3]
 
     position = torch.einsum("...ij,...j->...i", M, D2) + p1
     return position
