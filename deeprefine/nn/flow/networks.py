@@ -128,6 +128,14 @@ class BoltzmannGenerator(object):
     @property
     def device(self):
         return self.whitener.Twhiten.device
+    
+    def freeze(self):
+        for params in self.flow.parameters():
+            params.requires_grad_(False)
+    
+    def unfreeze(self):
+        for params in self.parameters():
+            params.requires_grad_(True)
 
     def TxzJ(self, x):
         """Transform x space to z space, with Jacobian
