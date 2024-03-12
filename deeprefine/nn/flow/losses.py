@@ -16,7 +16,7 @@ class MLlossNormal:
 
         energy_z = (0.5 / std_z**2) * torch.sum(output_z**2, dim=1, keepdim=True)
         if self.iwae:
-            loss = -torch.logsumexp(-energy_z + log_det_Jxz)
+            loss = -torch.logsumexp(-energy_z + log_det_Jxz, 0)[0]
             return loss
         else:
             return torch.mean(energy_z - log_det_Jxz)
@@ -40,7 +40,37 @@ class KLloss:
         E = self.energy_function(output_x) / temperature
         Ereg = linlogcut(E, Ehigh, Emax)
         if self.iwae:
-            loss = -torch.logsumexp(-Ereg + log_det_Jzx)
+            loss = -torch.logsumexp(-Ereg + log_det_Jzx, 0)[0]
             return loss
         else:
             return torch.mean(Ereg - log_det_Jzx)
+
+
+class RClossV1:
+    """
+    Use negative variance of RC features as RC loss
+    """
+    def __init__(self, rc_feature_indices):
+        self.rc_feature_indices = rc_feature_indices
+
+    def __call__(self, args):
+        output_x, _ = args[0], args[1]
+        rc_coords = output_x[:, self.rc_feature_indices]
+        return 1.0, -torch.mean(torch.var(rc_coords, dim=0))
+
+
+class RClossV2:
+    """
+    Use negative variance of RC features as RC loss, with adaptive scale
+    """
+    def __init__(self, rc_feature_indices, target_var):
+        self.rc_feature_indices = rc_feature_indices
+        self.target = target_var
+
+    def __call__(self, args):
+        output_x, _ = args[0], args[1]
+        rc_coords = output_x[:, self.rc_feature_indices]
+        sample_var = torch.mean(torch.var(rc_coords, dim=0))
+        adaptive_scale = 10.0**torch.log(self.target/sample_var)
+        return adaptive_scale.detach(), -sample_var
+
