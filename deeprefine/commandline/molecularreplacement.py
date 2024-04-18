@@ -170,7 +170,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     logger.info(f"MTZ file: {mtz_path}")
     logger.info(f"Fcolumn: {Fcolumn}, SIGFcolumn: {SIGFcolumn}, Freeflag: {freeflag}, testset: {testset_value}")
     
-    pdb_name = os.path.basename(pdb_path).split(".")[0]
+    pdb_name = os.path.basename(mtz_path).split(".")[0]
 
     # Initialize the dcp    
     dcp = sfc.SFcalculator(
