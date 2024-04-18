@@ -98,7 +98,7 @@ def set_logger(outdir):
     formatter_file = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
     # File handler
-    file_handler = logging.FileHandler(os.path.join(outdir, "mr.log"))
+    file_handler = logging.FileHandler(os.path.join(outdir, "mr.log"), mode='w')
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter_file)
 
@@ -156,6 +156,12 @@ def search_com(coms, propose_rmcom, dcp, solvent=False):
 
 def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, freeflag="FREE", Fcolumn="FP", SIGFcolumn="SIGFP", testset_value=0, plddt2pseudoB=False, solvent=False):
 
+    if os.path.exists(outdir):
+        print(f"Output dir exits: {outdir}", flush=True)
+    else:
+        os.mkdir(outdir)
+        print(f"Output dir created: {outdir}", flush=True)
+
     # Set up logger
     logger = set_logger(outdir)
 
@@ -163,11 +169,6 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     logger.info(f"PDB file: {pdb_path}")
     logger.info(f"MTZ file: {mtz_path}")
     logger.info(f"Fcolumn: {Fcolumn}, SIGFcolumn: {SIGFcolumn}, Freeflag: {freeflag}, testset: {testset_value}")
-    if os.path.exists(outdir):
-        logger.info(f"Output dir exits: {outdir}")
-    else:
-        os.mkdir(outdir)
-        logger.info(f"Output dir created: {outdir}")
     
     pdb_name = os.path.basename(pdb_path).split(".")[0]
 
@@ -181,10 +182,12 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     )
     st_rmcom = dcp.atom_pos_orth - torch.mean(dcp.atom_pos_orth, dim=0)
     if plddt2pseudoB:
+        logger.info(f"Converting PLDDT to pseudo B factors...")
         dcp.atom_b_iso = dr.utils.plddt2pseudoB(dcp.atom_b_iso)
     
     # Find the best coarse packing score to initialize
-    logger.info("Packing Socre Stag for scales...")
+    logger.info("="*30)
+    logger.info("Packing Socre Stage for scales...")
     vdw_rad = sfc.utils.vdw_rad_tensor(dcp.atom_name)
     uc_grid_orth_tensor = sfc.utils.unitcell_grid_center(dcp.unit_cell, 
                                                          spacing=4.5, 
@@ -220,6 +223,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     rfree_init, rwork_init = dcp.r_free.item(), dcp.r_work.item()
 
     # Rotation Search Stage
+    logger.info("="*30)
     logger.info("Rotation Search Stage...")
     # TODO: Find an algorithmic way to determine the range of patterson vector, instead of hard coding 
     patterson_uvw_arr_frac = sfc.patterson.uvw_array_frac(dcp.unit_cell, 7, 12, 0.3)
@@ -296,19 +300,20 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     propose_rmcom = torch.matmul(st_rmcom, propose_R)
     dcp.atom_pos_orth = propose_rmcom
     dcp.savePDB(os.path.join(outdir, pdb_name + "_MR_stage1.pdb"))
-    logger.info(f"Rotation Search Finished, model saved at {os.path.join(outdir, pdb_name + "_MR_stage1.pdb")}")
+    logger.info(f"Rotation Search Finished, model saved at {os.path.join(outdir, pdb_name + '_MR_stage1.pdb')}")
     
     torch.cuda.empty_cache()
     logger.debug(f"Memory consumed: {torch.cuda.memory_reserved() / 10**9:.2f}G, {torch.cuda.memory_allocated() / 10**9:.2f}G")
 
     # TODO: No need to do search on polar axis
+    logger.info("="*30)
     for j in range(n_trans):
         logger.info(f"Round {j+1}/{n_trans} Translational Search...")
         if j == 0:
             logger.debug("Translation search base grid: 24")
-            u_list = np.linspace(0,1,24)
-            v_list = np.linspace(0,1,24)
-            w_list = np.linspace(0,1,24)
+            u_list = np.linspace(0,1,n_basegrid)
+            v_list = np.linspace(0,1,n_basegrid)
+            w_list = np.linspace(0,1,n_basegrid)
             roundj_uvw_frac = np.array(np.meshgrid(u_list, v_list, w_list)).T.reshape(-1,3)
         else:
             roundj_uvw_frac = dr.geometry.getbestneighbours_cartesian(
@@ -333,9 +338,10 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     dcp.get_scales_adam()
     rfree_stage2, rwork_stage2 = dcp.r_free.item(), dcp.r_work.item()
     dcp.savePDB(os.path.join(outdir, pdb_name + "_MR_stage2.pdb"))
-    logger.info(f"Grid Search Finished, model saved at {os.path.join(outdir, pdb_name + "_MR_stage2.pdb")}")
-    logger.info(f"Rwork: {rwork_init:.2f} -> {rwork_stage2:.2f}, Rfree: {rfree_init:.2f} -> {rfree_stage2:.2f}")
+    logger.info(f"Grid Search Finished, model saved at {os.path.join(outdir, pdb_name + '_MR_stage2.pdb')}")
+    logger.info(f"Rwork: {rwork_init:.3f} -> {rwork_stage2:.3f}, Rfree: {rfree_init:.3f} -> {rfree_stage2:.3f}")
 
+    logger.info("="*30)
     logger.info("Gradient Descent Stage...")
     _, rbred_model, _, _ = dr.utils.rbr_quat_lbfgs(replaced_model, dcp, n_steps=15, loss_track=[], solvent=solvent, verbose=False)
     rbr_rmsd = dr.utils.rmsd(rbred_model, replaced_model)
@@ -346,10 +352,10 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     dcp.get_scales_adam()
     rwork_stage3, rfree_stage3 = dcp.r_free.item(), dcp.r_work.item()
     dcp.savePDB(os.path.join(outdir, pdb_name + "_MR_stage3.pdb"))
-    logger.info(f"Gradient Descent Finished, model saved at {os.path.join(outdir, pdb_name + "_MR_stage3.pdb")}")
-    logger.info(f"RMSD: {rbr_rmsd:.3f}A. Rwork: {rwork_init:.2f} -> {rwork_stage3:.2f}, Rfree: {rfree_init:.2f} -> {rfree_stage3:.2f}")
+    logger.info(f"Gradient Descent Finished, model saved at {os.path.join(outdir, pdb_name + '_MR_stage3.pdb')}")
+    logger.info(f"RMSD: {rbr_rmsd:.3f} A. Rwork: {rwork_init:.3f} -> {rwork_stage3:.3f}, Rfree: {rfree_init:.3f} -> {rfree_stage3:.3f}")
 
-    logger.info("Finished....")
+    logger.info("Finished...")
 
 def main():
     args = ArgumentParser().parse_args()
