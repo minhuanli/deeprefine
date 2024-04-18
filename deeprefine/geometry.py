@@ -212,7 +212,7 @@ def getbestneighbors_next_SO3(loss, quats, s2s1_arr, curr_res=2, N=50):
         allnb_s2s1 = np.concatenate((allnb_s2s1, nb_s2_s1_i), axis=0)
     return allnb_quats, allnb_s2s1
 
-
+# TODO: support non-uniform basegrid
 def getbestneighbours_cartesian(loss, current_uvw_array_frac, basegrid=24.0, 
                                 asu_brick_lim = [1.0, 1.0, 1.0],
                                 curr_res=1, N=40, drop_duplicates=True):

@@ -22,7 +22,8 @@ setup(name="deeprefine",
     entry_points={
         "console_scripts": [
             "dr.preppdb=deeprefine.commandline.preppdb:main",
-            "dr.runmd=deeprefine.commandline.runmd:main"
+            "dr.runmd=deeprefine.commandline.runmd:main",
+            "dr.mr=deeprefine.commandline.molecularreplacement:main"
         ]
     }
 )
