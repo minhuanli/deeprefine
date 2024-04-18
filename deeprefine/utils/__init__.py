@@ -8,7 +8,10 @@ __all__ = [
     "assert_tensor",
     "try_gpu",
     "assert_list",
-    "save_samples_to_pdb"
+    "save_samples_to_pdb",
+    "plddt2pseudoB",
+    "rbr_quat_lbfgs",
+    "rmsd"
 ]
 
 from deeprefine.utils.io import (
@@ -16,7 +19,7 @@ from deeprefine.utils.io import (
     align_md,
     remove_hydrogens,
     fix_missingresidues,
-    save_samples_to_pdb
+    save_samples_to_pdb,
 )
 
 from deeprefine.utils.md import (
@@ -28,4 +31,10 @@ from deeprefine.utils.types import (
     assert_tensor,
     assert_list,
     try_gpu
+)
+
+from deeprefine.utils.models import (
+    plddt2pseudoB,
+    rmsd,
+    rbr_quat_lbfgs
 )
