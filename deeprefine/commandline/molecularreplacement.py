@@ -159,7 +159,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     if os.path.exists(outdir):
         print(f"Output dir exits: {outdir}", flush=True)
     else:
-        os.mkdir(outdir)
+        os.makedirs(outdir)
         print(f"Output dir created: {outdir}", flush=True)
 
     # Set up logger
@@ -180,6 +180,9 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
         freeflag=freeflag,
         testset_value=testset_value
     )
+
+    logger.info(f"SpaceGroup: {dcp.space_group.hm}")
+    logger.info(f"UnitCell: {dcp.unit_cell.parameters}")
     st_rmcom = dcp.atom_pos_orth - torch.mean(dcp.atom_pos_orth, dim=0)
     if plddt2pseudoB:
         logger.info(f"Converting PLDDT to pseudo B factors...")
@@ -307,29 +310,43 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
 
     # TODO: No need to do search on polar axis
     logger.info("="*30)
-    for j in range(n_trans):
-        logger.info(f"Round {j+1}/{n_trans} Translational Search...")
-        if j == 0:
-            logger.debug("Translation search base grid: 24")
-            u_list = np.linspace(0,1,n_basegrid)
-            v_list = np.linspace(0,1,n_basegrid)
-            w_list = np.linspace(0,1,n_basegrid)
-            roundj_uvw_frac = np.array(np.meshgrid(u_list, v_list, w_list)).T.reshape(-1,3)
-        else:
-            roundj_uvw_frac = dr.geometry.getbestneighbours_cartesian(
-                -zfj, 
-                roundj_uvw_frac,
-                basegrid=n_basegrid,
-                curr_res=j,
-                N=40,
-                drop_duplicates=True
-            )
-        roundj_uvw_orth = torch.matmul(torch.tensor(roundj_uvw_frac).to(dcp.frac2orth_tensor), dcp.frac2orth_tensor.T)
-        zfj = search_com(roundj_uvw_orth, propose_rmcom, dcp, solvent=solvent)
-        logger.info(f"Best SF zdot score {np.max(zfj): .3f}, top 20%: {np.percentile(zfj, 20): .3f}, worst: {np.min(zfj): .3f}")
-    best_com = roundj_uvw_orth[np.argmax(zfj)]
+    polar_axis = sfc.get_polar_axis(dcp.space_group)
+    logger.info(f"Polar Axis: {polar_axis}")
+    if polar_axis == [0, 1, 2]:
+        logger.info(f"All Axes are polar, no need to do translational search, choose [0,5, 0.5, 0.5]...")
+        best_com_frac = np.array([0.5, 0.5, 0.5])
+        best_com = torch.matmul(torch.tensor(best_com_frac).to(dcp.frac2orth_tensor), dcp.frac2orth_tensor.T)
+    else:
+        for j in range(n_trans):
+            logger.info(f"Round {j+1}/{n_trans} Translational Search...")
+            if j == 0:
+                logger.debug(f"Translation search base grid: {n_basegrid}")
+                u_list = np.linspace(0,1,n_basegrid)
+                v_list = np.linspace(0,1,n_basegrid)
+                w_list = np.linspace(0,1,n_basegrid)
+                if polar_axis is not None:
+                    if 0 in polar_axis:
+                        u_list = np.array([0.5])
+                    if 1 in polar_axis:
+                        v_list = np.array([0.5])
+                    if 2 in polar_axis:
+                        w_list = np.array([0.5])
+                roundj_uvw_frac = np.array(np.meshgrid(u_list, v_list, w_list)).T.reshape(-1,3)
+            else:
+                roundj_uvw_frac = dr.geometry.getbestneighbours_cartesian(
+                    -zfj, 
+                    roundj_uvw_frac,
+                    basegrid=n_basegrid,
+                    curr_res=j,
+                    N=40,
+                    drop_duplicates=True,
+                    polar_axis=polar_axis,
+                )
+            roundj_uvw_orth = torch.matmul(torch.tensor(roundj_uvw_frac).to(dcp.frac2orth_tensor), dcp.frac2orth_tensor.T)
+            zfj = search_com(roundj_uvw_orth, propose_rmcom, dcp, solvent=solvent)
+            logger.info(f"Best SF zdot score {np.max(zfj): .3f}, top 20%: {np.percentile(zfj, 20): .3f}, worst: {np.min(zfj): .3f}")
+        best_com = roundj_uvw_orth[np.argmax(zfj)]
     replaced_model = propose_rmcom + best_com
-    
     dcp.atom_pos_orth = replaced_model
     dcp.inspect_data()
     dcp.calc_fprotein()
