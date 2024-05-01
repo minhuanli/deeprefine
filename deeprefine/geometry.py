@@ -142,21 +142,12 @@ def get_s2_neighbor(mini, curr_res):
     return hp.pix2ang(Nside, ind, nest=True), ind
 
 
-def get_base_ind(ind):
+def get_base_ind(ind, base_resol=1):
     '''
     Return the corresponding S2 and S1 grid index for an index on the base SO3 grid
     '''
-    psii = ind % 12
-    thetai = ind // 12
-    return thetai, psii
-
-
-def get_base_indr(ind):
-    '''
-    Return the corresponding S2 and S1 grid index for an index on the base SO3 grid
-    '''
-    psii = ind % 12
-    thetai = (ind/12).astype(int)
+    psii = ind % (6*2**base_resol)
+    thetai = ind // (6*2**base_resol)
     return thetai, psii
 
 
@@ -180,18 +171,16 @@ def get_neighbor_SO3(quat, s2i, s1i, curr_res):
     return quat_n[ii], ind[ii]
 
 # Loss based neighbor search
-
-
-def getbestneighbors_base_SO3(loss, base_quats, N=10):
+def getbestneighbors_base_SO3(loss, base_quats, N=10, base_resol=1):
     sort_index = np.argsort(loss)
     bestN_index = sort_index[:N]
     best_quats = base_quats[bestN_index]
-    s2_index, s1_index = get_base_ind(bestN_index)
+    s2_index, s1_index = get_base_ind(bestN_index, base_resol)
     allnb_quats = np.array([]).reshape(0, 4)
     allnb_s2s1 = np.array([]).reshape(0, 2)
     for i in range(N):
         nb_quats_i, nb_s2_s1_i = get_neighbor_SO3(
-            best_quats[i], s2_index[i], s1_index[i], 1)
+            best_quats[i], s2_index[i], s1_index[i], base_resol)
         allnb_quats = np.concatenate((allnb_quats, nb_quats_i), axis=0)
         allnb_s2s1 = np.concatenate((allnb_s2s1, nb_s2_s1_i), axis=0)
     return allnb_quats, allnb_s2s1
@@ -215,7 +204,7 @@ def getbestneighbors_next_SO3(loss, quats, s2s1_arr, curr_res=2, N=50):
 # TODO: support non-uniform basegrid
 def getbestneighbours_cartesian(loss, current_uvw_array_frac, basegrid=24.0, 
                                 asu_brick_lim = [1.0, 1.0, 1.0],
-                                curr_res=1, N=40, drop_duplicates=True):
+                                curr_res=1, N=40, drop_duplicates=True, polar_axis=None):
     sort_index = np.argsort(loss)
     bestN_index = sort_index[:N]
     current_best_uvw_frac = current_uvw_array_frac[bestN_index]
@@ -226,6 +215,14 @@ def getbestneighbours_cartesian(loss, current_uvw_array_frac, basegrid=24.0,
     du_list = np.linspace(-1,1,3) * xlim
     dv_list = np.linspace(-1,1,3) * ylim 
     dw_list = np.linspace(-1,1,3) * zlim
+    if polar_axis is not None:
+        if 0 in polar_axis:
+            du_list = np.array([0.0])
+        if 1 in polar_axis:
+            dv_list = np.array([0.0])
+        if 2 in polar_axis:
+            dw_list = np.array([0.0])
+
     duvw_array_frac = scale * np.array(np.meshgrid(du_list, dv_list, dw_list)).T.reshape(-1,3)
     
     nb_uvw_frac = current_best_uvw_frac[:, None, :] + duvw_array_frac[None, ...] 

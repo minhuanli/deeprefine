@@ -2,6 +2,7 @@
 Run molecule replacement with hierachical grid search and gradient descent
 '''
 import argparse
+import json
 import logging, sys, os
 import deeprefine as dr
 import SFC_Torch as sfc
@@ -72,10 +73,17 @@ class ArgumentParser(argparse.ArgumentParser):
         )
 
         self.add_argument( 
-            "--n_basegrid", 
+            "--trans_basegrid", 
             type=int, 
             default=24,
             help="Number of grid per axis for initial translational search"
+        )
+
+        self.add_argument( 
+            "--rot_basegrid", 
+            type=int, 
+            default=1,
+            help="Grid resolution for base rotation search, 1 ~ 30, 2 ~ 15"
         )
 
         self.add_argument(
@@ -123,12 +131,12 @@ def zscoredot_torch(Po, Pc):
     return zscore_dot
 
 # TODO: change the partition number per user's GPU size
-def search_rotations(rot_matrix, dcp, st_rmcom, propose_com,  patterson_uvw_arr_frac, Pu_o):
+def search_rotations(rot_matrix, dcp, st_rmcom, propose_com,  patterson_uvw_arr_frac, Pu_o, solvent=False):
     propose_rmcoms = torch.einsum("bij,aj->bai", rot_matrix, st_rmcom)
     propose_models = propose_rmcoms + propose_com
-    
     dcp.calc_fprotein_batch(atoms_position_batch=propose_models, PARTITION=40)
-    dcp.calc_fsolvent_batch(PARTITION=10)
+    if solvent:
+        dcp.calc_fsolvent_batch(PARTITION=10)
     Fmodel_batch = dcp.calc_ftotal_batch()
     Fc_batch = torch.abs(Fmodel_batch)
     Pu_c_batch = sfc.patterson.Patterson_torch_batch(patterson_uvw_arr_frac, 
@@ -154,7 +162,7 @@ def search_com(coms, propose_rmcom, dcp, solvent=False):
     return zdot_score_F
 
 
-def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, freeflag="FREE", Fcolumn="FP", SIGFcolumn="SIGFP", testset_value=0, plddt2pseudoB=False, solvent=False):
+def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, trans_basegrid=24, rot_basegrid=1, freeflag="FREE", Fcolumn="FP", SIGFcolumn="SIGFP", testset_value=0, plddt2pseudoB=False, solvent=False):
 
     if os.path.exists(outdir):
         print(f"Output dir exits: {outdir}", flush=True)
@@ -267,17 +275,17 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
 
     torch.cuda.empty_cache()
     logger.debug(f"Memory consumed: {torch.cuda.memory_reserved() / 10**9:.2f}G, {torch.cuda.memory_allocated() / 10**9:.2f}G")
-
     for i in range(n_rot):
         logger.info(f"Round {i+1}/{n_rot} Rotational Search...")
         if i == 0:
-            roundi_quats = dr.geometry.grid_SO3(1)
+            roundi_quats = dr.geometry.grid_SO3(rot_basegrid)
             roundi_matrix = dr.geometry.quaternions_to_SO3(roundi_quats)
         elif i == 1:
             roundi_quats, roundi_s2s1 = dr.geometry.getbestneighbors_base_SO3(
                 -zdot_score_roundi,
                 roundi_quats, 
-                N=40
+                N=40,
+                base_resol=rot_basegrid
             )
             roundi_matrix = dr.geometry.quaternions_to_SO3(roundi_quats)
         else:
@@ -285,7 +293,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
                 -zdot_score_roundi,
                 roundi_quats,
                 roundi_s2s1,
-                curr_res=i,
+                curr_res=i+rot_basegrid-1,
                 N=40
             )
             roundi_matrix = dr.geometry.quaternions_to_SO3(roundi_quats)
@@ -295,7 +303,8 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
             st_rmcom,
             propose_com,
             patterson_uvw_arr_frac,
-            Pu_o
+            Pu_o,
+            solvent
         )
         logger.info(f"Best patterson zdot score {np.max(zdot_score_roundi): .3f}, top 20%: {np.percentile(zdot_score_roundi, 20): .3f}, worst: {np.min(zdot_score_roundi): .3f}")
     bestR_index = np.argmax(zdot_score_roundi)
@@ -320,10 +329,10 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
         for j in range(n_trans):
             logger.info(f"Round {j+1}/{n_trans} Translational Search...")
             if j == 0:
-                logger.debug(f"Translation search base grid: {n_basegrid}")
-                u_list = np.linspace(0,1,n_basegrid)
-                v_list = np.linspace(0,1,n_basegrid)
-                w_list = np.linspace(0,1,n_basegrid)
+                logger.debug(f"Translation search base grid: {trans_basegrid}")
+                u_list = np.linspace(0,1,trans_basegrid)
+                v_list = np.linspace(0,1,trans_basegrid)
+                w_list = np.linspace(0,1,trans_basegrid)
                 if polar_axis is not None:
                     if 0 in polar_axis:
                         u_list = np.array([0.5])
@@ -336,7 +345,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
                 roundj_uvw_frac = dr.geometry.getbestneighbours_cartesian(
                     -zfj, 
                     roundj_uvw_frac,
-                    basegrid=n_basegrid,
+                    basegrid=trans_basegrid,
                     curr_res=j,
                     N=40,
                     drop_duplicates=True,
@@ -351,7 +360,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     dcp.inspect_data()
     dcp.calc_fprotein()
     if solvent:
-        dcp.calc_solvent()
+        dcp.calc_fsolvent()
     dcp.get_scales_adam()
     rfree_stage2, rwork_stage2 = dcp.r_free.item(), dcp.r_work.item()
     dcp.savePDB(os.path.join(outdir, pdb_name + "_MR_stage2.pdb"))
@@ -365,7 +374,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, n_basegrid=24, f
     dcp.atom_pos_orth = rbred_model
     dcp.calc_fprotein()
     if solvent:
-        dcp.calc_solvent()
+        dcp.calc_fsolvent()
     dcp.get_scales_adam()
     rwork_stage3, rfree_stage3 = dcp.r_free.item(), dcp.r_work.item()
     dcp.savePDB(os.path.join(outdir, pdb_name + "_MR_stage3.pdb"))
@@ -382,7 +391,8 @@ def main():
         args.outdir,
         n_rot=args.n_rot,
         n_trans=args.n_trans,
-        n_basegrid=args.n_basegrid,
+        trans_basegrid=args.trans_basegrid,
+        rot_basegrid=args.rot_basegrid,
         freeflag=args.freeflag,
         Fcolumn=args.Fcolumn,
         SIGFcolumn=args.SigFcolumn,
@@ -390,7 +400,8 @@ def main():
         plddt2pseudoB=args.plddt2pseudoB,
         solvent=args.solvent
     )
-
+    with open(os.path.join(args.outdir, "config.json"), 'w') as file:
+        json.dump(vars(args), file, indent=4)
 
 
 
