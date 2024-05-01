@@ -63,7 +63,7 @@ def grid_s2(resol=1):
     return theta, phi
 
 
-def hopf_to_quat(theta, phi, psi):
+def hopf_to_quat(theta, phi, psi) -> np.ndarray:
     '''
     Hopf coordinates to quaternions
     theta: [0,pi]
@@ -80,7 +80,7 @@ def hopf_to_quat(theta, phi, psi):
     return quat.T.astype(np.float32)
 
 
-def grid_SO3(resol):
+def grid_SO3(resol) -> np.ndarray:
     theta, phi = grid_s2(resol)
     psi = grid_s1(resol)
     quat = hopf_to_quat(np.repeat(theta, len(psi)),  # repeats each element by len(psi)
@@ -90,7 +90,34 @@ def grid_SO3(resol):
     return quat
 
 
-def quaternions_to_SO3(q):
+def quat_distance(q1, q2):
+    """
+    q1: [n1, 4]
+    q2: [n2, 4]
+    
+    Return:
+        [n1, n2]
+    """
+    q1 = q1 / np.linalg.norm(q1, ord=2, axis=-1, keepdims=True)
+    q2 = q2 / np.linalg.norm(q2, ord=2, axis=-1, keepdims=True)
+    args = np.abs(np.sum(q1[:, None, :]*q2[None,...], axis=-1))
+    return 2.*np.arccos(args)
+
+
+def mat_distance(R1, R2):
+    """
+    R1: [a, 3, 3]
+    R2: [b, 3, 3]
+
+    Return:
+        [a, b]
+    """
+    R = np.einsum("axy,bzy->abxz", R1, R2)
+    args = (np.einsum("abii", R) - 1) / 2.0
+    return np.arccos(args)
+
+
+def quaternions_to_SO3(q) -> torch.Tensor:
     """
     Normalizes q and maps to group matrix.
     https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation#Quaternion-derived_rotation_matrix
@@ -114,6 +141,33 @@ def quaternions_to_SO3(q):
         ],
         -1,
     ).view(*q.shape[:-1], 3, 3)
+
+
+def SO3_to_quaternions(mats) -> np.array:
+    """
+    mat: [n, 3, 3]
+
+    Return: [n, 4]
+    """
+    mats = dr.assert_numpy(mats)
+    w, v = np.linalg.eig(mats)
+    ind = np.argwhere(np.isclose(w, 1.0))
+    us = np.real(v[ind[:,0], :, ind[:, 1]])
+    
+    # take a random vector v orthogonal to u, determine sign of sin(theta/2)
+    # https://math.stackexchange.com/questions/893984/conversion-of-rotation-matrix-to-quaternion
+    v_rand = np.random.rand(3)
+    vs = np.cross(us, v_rand)
+    signs = np.sign(np.einsum("nx,nx->n", np.cross(vs, np.einsum("nxy,ny->nx", mats, vs)), us))
+
+    args = (np.einsum("nii", mats) - 1)/2
+    thetas = np.arccos(args)
+    cos_halftheta = np.cos(thetas/2.0)
+    sin_halftheta = np.sin(thetas/2.0) * signs
+    qs = np.concatenate([cos_halftheta[:, None], sin_halftheta[:, None] * us], axis=1)
+    qs = qs / np.linalg.norm(qs, axis=-1, keepdims=True)
+    return qs
+
 
 # Neighbors on the Hopf grid
 def get_s1_neighbor(mini, curr_res):
