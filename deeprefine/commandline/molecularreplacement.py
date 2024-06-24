@@ -59,16 +59,37 @@ class ArgumentParser(argparse.ArgumentParser):
         )
 
         self.add_argument( 
+            "--dmin", 
+            type=float, 
+            default=4.0,
+            help="High resolution cutoff"
+        )
+
+        self.add_argument( 
+            "--pts_min", 
+            type=float, 
+            default=7.0,
+            help="Minimum patterson vector length in rotation search"
+        )
+
+        self.add_argument( 
+            "--pts_max", 
+            type=float, 
+            default=12.0,
+            help="Maximum patterson vector length in rotation search"
+        )
+
+        self.add_argument( 
             "--n_rot", 
             type=int, 
-            default=5,
+            default=4,
             help="Number of hierachical rotational search rounds"
         )
 
         self.add_argument( 
             "--n_trans", 
             type=int, 
-            default=5,
+            default=4,
             help="Number of hierachical translational search rounds"
         )
 
@@ -90,6 +111,12 @@ class ArgumentParser(argparse.ArgumentParser):
             "--solvent", 
             action="store_true",
             help="Use solvent mask"
+        )
+
+        self.add_argument(
+            "--shell", 
+            action="store_true",
+            help="Use shell slicing in correlation calculation"
         )
 
         self.add_argument(
@@ -130,13 +157,23 @@ def zscoredot_torch(Po, Pc):
     zscore_dot = torch.mean(Po_zscored*Pc_zscored, dim=-1)
     return zscore_dot
 
+def zscoredot_torch_shell(Po, Pc, assignment):
+    zdots = []
+    n_bins = len(np.unique(assignment))
+    for i in range(n_bins):
+        resol_bool = (assignment == i)
+        zdot_i = zscoredot_torch(Po[resol_bool], Pc[:, resol_bool])
+        zdots.append(zdot_i)
+    zscoredots = torch.stack(zdots).mean(0)
+    return zscoredots
+
 # TODO: change the partition number per user's GPU size
 def search_rotations(rot_matrix, dcp, st_rmcom, propose_com,  patterson_uvw_arr_frac, Pu_o, solvent=False):
     propose_rmcoms = torch.einsum("bij,aj->bai", rot_matrix, st_rmcom)
     propose_models = propose_rmcoms + propose_com
-    dcp.calc_fprotein_batch(atoms_position_batch=propose_models, PARTITION=40)
+    dcp.calc_fprotein_batch(atoms_position_batch=propose_models, PARTITION=400)
     if solvent:
-        dcp.calc_fsolvent_batch(PARTITION=10)
+        dcp.calc_fsolvent_batch(PARTITION=100)
     Fmodel_batch = dcp.calc_ftotal_batch()
     Fc_batch = torch.abs(Fmodel_batch)
     Pu_c_batch = sfc.patterson.Patterson_torch_batch(patterson_uvw_arr_frac, 
@@ -145,24 +182,58 @@ def search_rotations(rot_matrix, dcp, st_rmcom, propose_com,  patterson_uvw_arr_
                                                      dcp.unit_cell.volume, 
                                                      sharpen=True, remove_origin=True, 
                                                      PARTITION_uvw=10000,
-                                                     PARTITION_batch=20,
+                                                     PARTITION_batch=200,
                                                      no_grad=True)
     zdot_score = dr.assert_numpy(zscoredot_torch(Pu_o, Pu_c_batch))
     return zdot_score
 
+def search_rotations_shell(rot_matrix, dcp, st_rmcom, propose_com, patterson_uvw_arr_frac, Pu_o, assignment, solvent=False):
+    propose_rmcoms = torch.einsum("bij,aj->bai", rot_matrix, st_rmcom)
+    propose_models = propose_rmcoms + propose_com
+    
+    dcp.calc_fprotein_batch(atoms_position_batch=propose_models, PARTITION=400)
+    if solvent:
+        dcp.calc_fsolvent_batch(PARTITION=100)
+    Fmodel_batch = dcp.calc_ftotal_batch()
+    Fc_batch = torch.abs(Fmodel_batch)
+    Pu_c_batch = sfc.patterson.Patterson_torch_batch(patterson_uvw_arr_frac, 
+                                                     Fc_batch, 
+                                                     dcp.HKL_array, 
+                                                     dcp.unit_cell.volume, 
+                                                     sharpen=True, remove_origin=True, 
+                                                     PARTITION_uvw=10000,
+                                                     PARTITION_batch=200,
+                                                     no_grad=True)
+    zdot_score = dr.assert_numpy(zscoredot_torch_shell(Pu_o, Pu_c_batch, assignment))
+    return zdot_score
 
 def search_com(coms, propose_rmcom, dcp, solvent=False):
     propose_models = propose_rmcom[None,...] + coms[:,None,:]
-    dcp.calc_fprotein_batch(atoms_position_batch=propose_models, PARTITION=20)
+    dcp.calc_fprotein_batch(atoms_position_batch=propose_models, PARTITION=200)
     if solvent:
-        dcp.calc_fsolvent_batch(PARTITION=10)
+        dcp.calc_fsolvent_batch(PARTITION=100)
     Fmodel_batch = dcp.calc_ftotal_batch()
     Fc_batch = torch.abs(Fmodel_batch)
     zdot_score_F = dr.assert_numpy(zscoredot_torch(dcp.Fo, Fc_batch))
     return zdot_score_F
 
-
-def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, trans_basegrid=24, rot_basegrid=1, freeflag="FREE", Fcolumn="FP", SIGFcolumn="SIGFP", testset_value=0, plddt2pseudoB=False, solvent=False):
+def MR_pipeline(pdb_path, 
+                mtz_path, 
+                outdir, 
+                n_rot=3, 
+                n_trans=4, 
+                trans_basegrid=24, 
+                rot_basegrid=1, 
+                freeflag="FREE", 
+                Fcolumn="FP", 
+                SIGFcolumn="SIGFP", 
+                testset_value=0, 
+                plddt2pseudoB=False, 
+                solvent=False,
+                dmin=3.0,
+                pts_min=10.0,
+                pts_max=13.0,
+                shell=False):
 
     if os.path.exists(outdir):
         print(f"Output dir exits: {outdir}", flush=True)
@@ -186,7 +257,8 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, trans_basegrid=2
         mtzdata=mtz_path,
         expcolumns=[Fcolumn, SIGFcolumn],
         freeflag=freeflag,
-        testset_value=testset_value
+        testset_value=testset_value,
+        dmin=dmin
     )
 
     logger.info(f"SpaceGroup: {dcp.space_group.hm}")
@@ -237,44 +309,48 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, trans_basegrid=2
     logger.info("="*30)
     logger.info("Rotation Search Stage...")
     # TODO: Find an algorithmic way to determine the range of patterson vector, instead of hard coding 
-    patterson_uvw_arr_frac = sfc.patterson.uvw_array_frac(dcp.unit_cell, 7, 12, 0.3)
+    patterson_uvw_arr_frac = sfc.patterson.uvw_array_frac(dcp.unit_cell, pts_min, pts_max, 0.3)
     
     logger.info("Experimental Patterson function value...")
     Pu_o = sfc.patterson.Patterson_torch(patterson_uvw_arr_frac, 
                                          dcp.Fo, dcp.HKL_array, dcp.unit_cell.volume,
                                          sharpen=True, remove_origin=True,
                                          PARTITION=10000)
+    patterson_uvw_arr_orth = dcp.frac2orth(dr.assert_tensor(patterson_uvw_arr_frac, arr_type=torch.float32))
+    patterson_len = dr.assert_numpy(torch.norm(patterson_uvw_arr_orth, dim=-1))
+    assignment, _ = sfc.utils.bin_by_logarithmic(1./patterson_len, bins=20, Nmin=len(patterson_len) // 24)
     torch.cuda.empty_cache()
-    logger.debug(f"Memory consumed: {torch.cuda.memory_reserved() / 10**9:.2f}G, {torch.cuda.memory_allocated() / 10**9:.2f}G")
+    logger.debug(f"Memory peak: {torch.cuda.max_memory_allocated() / 10**9:.2f}G, Memory current: {torch.cuda.memory_allocated() / 10**9:.2f}G")
     
-    logger.info("Choosing a starting COM with Patterson Score...")
-    batch_model = st_rmcom + uvw_array_orth[:,None,:]
-    dcp.calc_fprotein_batch(atoms_position_batch=batch_model, PARTITION=20)
-    if solvent:
-        dcp.calc_fsolvent_batch(PARTITION=10)
-    Fmodel_batch = dcp.calc_ftotal_batch()
-    Fc_batch = torch.abs(Fmodel_batch)
-    logger.debug(f"Memory consumed: {torch.cuda.memory_reserved() / 10**9:.2f}G, {torch.cuda.memory_allocated() / 10**9:.2f}G")
-    Pu_c_batch = sfc.patterson.Patterson_torch_batch(patterson_uvw_arr_frac, 
-                                                     Fc_batch, 
-                                                     dcp.HKL_array, 
-                                                     dcp.unit_cell.volume, 
-                                                     sharpen=True, remove_origin=True, 
-                                                     PARTITION_uvw=10000,
-                                                     PARTITION_batch=20,
-                                                     no_grad=True)
-    zdot_asu1_tensor = zscoredot_torch(Pu_o, Pu_c_batch)
-    clash_cutoff = np.percentile(ps_asu1_array[:,1], 20)
-    ww = ps_asu1_array[:,1] < clash_cutoff
-    uvw_array_orth_goodps = uvw_array_orth[ww]
-    zdot_asu1_tensor_goodps = zdot_asu1_tensor[ww]
-    w2 = torch.argmax(zdot_asu1_tensor_goodps)
-    propose_com = uvw_array_orth_goodps[w2]
-    logger.info(f"Candidate patterson zdot score: {zdot_asu1_tensor_goodps[w2].item():.3f}")
-    logger.debug(f"Candidate packing score: {ps_asu1_array[ww][w2.item(), 0]*100:.2f}%, clashing score: {ps_asu1_array[ww][w2.item(), 1]*100:.2f}%")
-
-    torch.cuda.empty_cache()
-    logger.debug(f"Memory consumed: {torch.cuda.memory_reserved() / 10**9:.2f}G, {torch.cuda.memory_allocated() / 10**9:.2f}G")
+    # logger.info("Choosing a starting COM with Patterson Score...")
+    # batch_model = st_rmcom + uvw_array_orth[:,None,:]
+    # dcp.calc_fprotein_batch(atoms_position_batch=batch_model, PARTITION=200)
+    # if solvent:
+    #     dcp.calc_fsolvent_batch(PARTITION=100)
+    # Fmodel_batch = dcp.calc_ftotal_batch()
+    # Fc_batch = torch.abs(Fmodel_batch)
+    # logger.debug(f"Memory peak: {torch.cuda.max_memory_allocated() / 10**9:.2f}G, Memory current: {torch.cuda.memory_allocated() / 10**9:.2f}G")
+    # Pu_c_batch = sfc.patterson.Patterson_torch_batch(patterson_uvw_arr_frac, 
+    #                                                  Fc_batch, 
+    #                                                  dcp.HKL_array, 
+    #                                                  dcp.unit_cell.volume, 
+    #                                                  sharpen=True, remove_origin=True, 
+    #                                                  PARTITION_uvw=10000,
+    #                                                  PARTITION_batch=200,
+    #                                                  no_grad=True)
+    # zdot_asu1_tensor = zscoredot_torch(Pu_o, Pu_c_batch)
+    # clash_cutoff = np.percentile(ps_asu1_array[:,1], 20)
+    # ww = ps_asu1_array[:,1] < clash_cutoff
+    # uvw_array_orth_goodps = uvw_array_orth[ww]
+    # zdot_asu1_tensor_goodps = zdot_asu1_tensor[ww]
+    # w2 = torch.argmax(zdot_asu1_tensor_goodps)
+    # propose_com = uvw_array_orth_goodps[w2]
+    # logger.info(f"Candidate patterson zdot score: {zdot_asu1_tensor_goodps[w2].item():.3f}")
+    # logger.debug(f"Candidate packing score: {ps_asu1_array[ww][w2.item(), 0]*100:.2f}%, clashing score: {ps_asu1_array[ww][w2.item(), 1]*100:.2f}%")
+   
+    # torch.cuda.empty_cache()
+    # logger.debug(f"Memory peak: {torch.cuda.max_memory_allocated() / 10**9:.2f}G, Memory current: {torch.cuda.memory_allocated() / 10**9:.2f}G")
+    propose_com = round1_com
     for i in range(n_rot):
         logger.info(f"Round {i+1}/{n_rot} Rotational Search...")
         if i == 0:
@@ -297,15 +373,28 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, trans_basegrid=2
                 N=40
             )
             roundi_matrix = dr.geometry.quaternions_to_SO3(roundi_quats)
-        zdot_score_roundi = search_rotations(
-            roundi_matrix,
-            dcp,
-            st_rmcom,
-            propose_com,
-            patterson_uvw_arr_frac,
-            Pu_o,
-            solvent
-        )
+        
+        if shell:
+            zdot_score_roundi = search_rotations_shell(
+                roundi_matrix,
+                dcp,
+                st_rmcom,
+                propose_com,
+                patterson_uvw_arr_frac,
+                Pu_o,
+                assignment,
+                solvent,
+            )
+        else:
+            zdot_score_roundi = search_rotations(
+                roundi_matrix,
+                dcp,
+                st_rmcom,
+                propose_com,
+                patterson_uvw_arr_frac,
+                Pu_o,
+                solvent,
+            )
         logger.info(f"Best patterson zdot score {np.max(zdot_score_roundi): .3f}, top 20%: {np.percentile(zdot_score_roundi, 20): .3f}, worst: {np.min(zdot_score_roundi): .3f}")
     bestR_index = np.argmax(zdot_score_roundi)
     propose_R = roundi_matrix[bestR_index].T
@@ -315,7 +404,7 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, trans_basegrid=2
     logger.info(f"Rotation Search Finished, model saved at {os.path.join(outdir, pdb_name + '_MR_stage1.pdb')}")
     
     torch.cuda.empty_cache()
-    logger.debug(f"Memory consumed: {torch.cuda.memory_reserved() / 10**9:.2f}G, {torch.cuda.memory_allocated() / 10**9:.2f}G")
+    logger.debug(f"Memory peak: {torch.cuda.max_memory_allocated() / 10**9:.2f}G, Memory current: {torch.cuda.memory_allocated() / 10**9:.2f}G")
 
     # TODO: No need to do search on polar axis
     logger.info("="*30)
@@ -366,9 +455,11 @@ def MR_pipeline(pdb_path, mtz_path, outdir, n_rot=6, n_trans=5, trans_basegrid=2
     dcp.savePDB(os.path.join(outdir, pdb_name + "_MR_stage2.pdb"))
     logger.info(f"Grid Search Finished, model saved at {os.path.join(outdir, pdb_name + '_MR_stage2.pdb')}")
     logger.info(f"Rwork: {rwork_init:.3f} -> {rwork_stage2:.3f}, Rfree: {rfree_init:.3f} -> {rfree_stage2:.3f}")
+    logger.debug(f"Memory peak: {torch.cuda.max_memory_allocated() / 10**9:.2f}G, Memory current: {torch.cuda.memory_allocated() / 10**9:.2f}G")
 
     logger.info("="*30)
     logger.info("Gradient Descent Stage...")
+    
     _, rbred_model, _, _ = dr.utils.rbr_quat_lbfgs(replaced_model, dcp, n_steps=15, loss_track=[], solvent=solvent, verbose=False)
     rbr_rmsd = dr.utils.rmsd(rbred_model, replaced_model)
     dcp.atom_pos_orth = rbred_model
@@ -398,7 +489,11 @@ def main():
         SIGFcolumn=args.SigFcolumn,
         testset_value=args.testset_value,
         plddt2pseudoB=args.plddt2pseudoB,
-        solvent=args.solvent
+        solvent=args.solvent,
+        dmin=args.dmin,
+        pts_min=args.pts_min,
+        pts_max=args.pts_max,
+        shell=args.shell
     )
     with open(os.path.join(args.outdir, "config.json"), 'w') as file:
         json.dump(vars(args), file, indent=4)
