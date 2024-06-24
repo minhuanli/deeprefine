@@ -19,6 +19,56 @@ from deeprefine.utils.types import assert_numpy
 
 from openmm import unit
 
+def geo_minimize(
+    pdbmodel_dir,
+    temp,
+    implicit_solvent=True,
+):
+    """
+    Geometrically minimize model energy, return minized energy in RT and positions in Angstron
+    """
+    import openmm.app as app
+    import openmm.unit as unit
+    from openmm import LangevinIntegrator
+
+    INTEGRATOR_ARGS = (
+        temp * unit.kelvin,
+        1.0 / unit.picoseconds,
+        2.0 * unit.femtoseconds,
+    )
+
+    pdb = app.PDBFile(pdbmodel_dir)
+    if implicit_solvent:
+        forcefield = app.ForceField(
+            "amber99sb.xml", "amber99_obc.xml"
+        )  # implicit Solvent
+    else:
+        forcefield = app.ForceField(
+            "amber14/protein.ff14SB.xml", "amber14/tip3p.xml"
+        )  # explicit Solvent
+
+    system = forcefield.createSystem(
+        pdb.topology,
+        removeCMMotion=False,
+        nonbondedMethod=app.CutoffNonPeriodic,
+        nonbondedCutoff=1.0 * unit.nanometers,
+        constraints=None,
+        rigidWater=True,
+    )
+    integrator = LangevinIntegrator(*INTEGRATOR_ARGS)
+    simulation = app.Simulation(pdb.topology, system, integrator)
+    simulation.context.setPositions(pdb.positions)
+    simulation.minimizeEnergy()
+
+    state = simulation.context.getState(getPositions=True, getEnergy=True)
+    minimized_positions = state.getPositions()
+
+    unit_reciprocal = 1 / (
+        temp * unit.kelvin * unit.MOLAR_GAS_CONSTANT_R
+    ).value_in_unit(unit.kilojoule_per_mole)
+    energy = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole) * unit_reciprocal
+    minimized_positions_array = np.array(minimized_positions.value_in_unit(unit.angstrom))
+    return energy, minimized_positions_array    
 
 def setup_protein(
     pdbmodel_dir,
@@ -35,7 +85,7 @@ def setup_protein(
         path str to the model PDB file
     temp: int or float
         Temperature of the system in Kelvin
-    implicit_solvnet : Boolean, default True
+    implicit_solvent : Boolean, default True
         Choose which force field file to use. If True, use the implicit solvent one; else use the explicit solvent model
     length_scale : default openmm.unit.angstroms
         length unit of your model coordinates, in openmm.unit

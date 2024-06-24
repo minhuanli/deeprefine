@@ -6,7 +6,7 @@ from deeprefine import protein
 from deeprefine import nn
 
 # Top level API
-from deeprefine.energy.openmm import setup_protein
+from deeprefine.energy.openmm import setup_protein, geo_minimize
 from deeprefine.protein.zmatrix import get_indices
 from deeprefine.protein.icconverter import ICConverter
 from deeprefine.protein.whiten import Whitener

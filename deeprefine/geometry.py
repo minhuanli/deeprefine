@@ -6,7 +6,7 @@ All codes are tensorflow-ified
 import torch
 import numpy as np
 import healpy as hp
-from deeprefine.utils import assert_tensor
+from deeprefine.utils import assert_tensor, assert_numpy
 
 # Two vector representation of SO3
 def construct_SO3(v1, v2):
@@ -149,7 +149,7 @@ def SO3_to_quaternions(mats) -> np.array:
 
     Return: [n, 4]
     """
-    mats = dr.assert_numpy(mats)
+    mats = assert_numpy(mats)
     w, v = np.linalg.eig(mats)
     ind = np.argwhere(np.isclose(w, 1.0))
     us = np.real(v[ind[:,0], :, ind[:, 1]])
