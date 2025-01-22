@@ -3,12 +3,13 @@ import numpy as np
 # template for each residue type
 basis_Zs = {}
 
+# No Chi angle
 basis_Zs["ALA"] = [
-    ["H", "N", "CA", "C"],
-    ["O", "C", "CA", "N"],
-    ["HA", "CA", "C", "O"],
-    ["CB", "CA", "C", "O"],
-    ["HB1", "CB", "CA", "N"],
+    ["H", "N", "CA", "C"], # ~ phi
+    ["O", "C", "CA", "N"], # ~ psi
+    ["HA", "CA", "C", "O"], # ~ psi
+    ["CB", "CA", "C", "O"], # ~ psi
+    ["HB1", "CB", "CA", "N"], 
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
 ]
@@ -18,9 +19,9 @@ basis_Zs["LEU"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
+    ["CG", "CB", "CA", "N"], # ~ chi 1
     ["CD1", "CG", "CB", "CA"],
-    ["CD2", "CG", "CB", "CA"],
+    ["CD2", "CG", "CB", "CA"], # ~ chi 2
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
     ["HG", "CG", "CB", "CA"],
@@ -37,9 +38,9 @@ basis_Zs["ILE"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG1", "CB", "CA", "N"],
+    ["CG1", "CB", "CA", "N"], # Chi 1
     ["CG2", "CB", "CA", "N"],
-    ["CD1", "CG1", "CB", "CA"],
+    ["CD1", "CG1", "CB", "CA"], # Chi 2
     ["HB", "CB", "CA", "N"],
     ["HG12", "CG1", "CB", "CA"],
     ["HG13", "CG1", "CB", "CA"],
@@ -56,7 +57,7 @@ basis_Zs["CYS"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["SG", "CB", "CA", "N"],
+    ["SG", "CB", "CA", "N"], # chi 1
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
     ["HG", "SG", "CB", "CA"],
@@ -67,8 +68,8 @@ basis_Zs["HIS"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["ND1", "CG", "CB", "CA"],
+    ["CG", "CB", "CA", "N"], # Chi 1
+    ["ND1", "CG", "CB", "CA"], # Chi 2
     ["HD1", "ND1", "CG", "CB"],
     ["CD2", "CG", "CB", "CA"],
     ["CE1", "ND1", "CG", "CB"],
@@ -85,8 +86,8 @@ basis_Zs["ASP"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["OD1", "CG", "CB", "CA"],
+    ["CG", "CB", "CA", "N"], # Chi 1
+    ["OD1", "CG", "CB", "CA"], # Chi 2
     ["OD2", "CG", "CB", "CA"],
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
@@ -97,8 +98,8 @@ basis_Zs["ASN"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["OD1", "CG", "CB", "CA"],
+    ["CG", "CB", "CA", "N"], # Chi 1
+    ["OD1", "CG", "CB", "CA"], # Chi 2
     ["ND2", "CG", "CB", "CA"],
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
@@ -111,9 +112,9 @@ basis_Zs["GLN"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["CD", "CG", "CB", "CA"],
-    ["OE1", "CD", "CG", "CB"],
+    ["CG", "CB", "CA", "N"], # Chi 1
+    ["CD", "CG", "CB", "CA"], # Chi 2
+    ["OE1", "CD", "CG", "CB"], # Chi 3
     ["NE2", "CD", "CG", "CB"],
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
@@ -128,9 +129,9 @@ basis_Zs["GLU"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["CD", "CG", "CB", "CA"],
-    ["OE1", "CD", "CG", "CB"],
+    ["CG", "CB", "CA", "N"], # Chi 1
+    ["CD", "CG", "CB", "CA"], # Chi 2
+    ["OE1", "CD", "CG", "CB"], # Chi 3
     ["OE2", "CD", "CG", "CB"],
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
@@ -152,8 +153,8 @@ basis_Zs["TRP"] = [
     ["CB", "CA", "C", "O"],
     ["HB2", "CB", "CA", "C"],
     ["HB3", "CB", "CA", "C"],
-    ["CG", "CB", "CA", "N"],
-    ["CD1", "CG", "CB", "CA"],
+    ["CG", "CB", "CA", "N"], # Chi 1
+    ["CD1", "CG", "CB", "CA"], # Chi 2
     ["HD1", "CD1", "CG", "CB"],
     ["CD2", "CG", "CB", "CA"],
     ["NE1", "CD1", "CG", "CB"],
@@ -174,8 +175,8 @@ basis_Zs["TYR"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["CD1", "CG", "CB", "CA"],
+    ["CG", "CB", "CA", "N"], # chi 1
+    ["CD1", "CG", "CB", "CA"], # chi 2
     ["CD2", "CG", "CB", "CA"],
     ["CE1", "CD1", "CG", "CB"],
     ["CE2", "CD2", "CG", "CB"],
@@ -192,10 +193,10 @@ basis_Zs["TYR"] = [
 
 basis_Zs["SER"] = [
     ["H", "N", "CA", "C"],
-    ["O", "C", "CA", "N"],
+    ["O", "C", "CA", "N"], 
     ["HA", "CA", "C", "O"],
-    ["CB", "CA", "C", "O"],
-    ["OG", "CB", "CA", "N"],
+    ["CB", "CA", "C", "O"], 
+    ["OG", "CB", "CA", "N"], # chi 1
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
     ["HG", "OG", "CB", "CA"],
@@ -205,8 +206,8 @@ basis_Zs["PRO"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["CD", "CG", "CB", "CA"],
+    ["CG", "CB", "CA", "N"], # chi 1
+    ["CD", "CG", "CB", "CA"], # chi 2
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
     ["HG2", "CG", "CB", "CA"],
@@ -220,11 +221,11 @@ basis_Zs["ARG"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["CD", "CG", "CB", "CA"],
-    ["NE", "CD", "CG", "CB"],
-    ["CZ", "NE", "CD", "CG"],
-    ["NH1", "CZ", "NE", "CD"],
+    ["CG", "CB", "CA", "N"], # chi 1
+    ["CD", "CG", "CB", "CA"], # chi 2
+    ["NE", "CD", "CG", "CB"], # chi 3
+    ["CZ", "NE", "CD", "CG"], # chi 4
+    ["NH1", "CZ", "NE", "CD"], # chi 5
     ["NH2", "CZ", "NE", "CD"],
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
@@ -244,10 +245,10 @@ basis_Zs["LYS"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["CD", "CG", "CB", "CA"],
-    ["CE", "CD", "CG", "CB"],
-    ["NZ", "CE", "CD", "CG"],
+    ["CG", "CB", "CA", "N"], # chi 1
+    ["CD", "CG", "CB", "CA"], # chi 2
+    ["CE", "CD", "CG", "CB"], # chi 3
+    ["NZ", "CE", "CD", "CG"], # chi 4
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
     ["HG2", "CG", "CB", "CA"],
@@ -266,9 +267,9 @@ basis_Zs["MET"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["SD", "CG", "CB", "CA"],
-    ["CE", "SD", "CG", "CB"],
+    ["CG", "CB", "CA", "N"], # chi 1
+    ["SD", "CG", "CB", "CA"], # chi 2
+    ["CE", "SD", "CG", "CB"], # chi 3
     ["HB2", "CB", "CA", "N"],
     ["HB3", "CB", "CA", "N"],
     ["HG2", "CG", "CB", "CA"],
@@ -283,7 +284,7 @@ basis_Zs["THR"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["OG1", "CB", "CA", "N"],
+    ["OG1", "CB", "CA", "N"], # chi 1
     ["CG2", "CB", "CA", "N"],
     ["HB", "CB", "CA", "N"],
     ["HG1", "OG1", "CB", "CA"],
@@ -297,7 +298,7 @@ basis_Zs["VAL"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG1", "CB", "CA", "N"],
+    ["CG1", "CB", "CA", "N"], # chi 1
     ["CG2", "CB", "CA", "N"],
     ["HB", "CB", "CA", "N"],
     ["HG11", "CG1", "CB", "CA"],
@@ -313,8 +314,8 @@ basis_Zs["PHE"] = [
     ["O", "C", "CA", "N"],
     ["HA", "CA", "C", "O"],
     ["CB", "CA", "C", "O"],
-    ["CG", "CB", "CA", "N"],
-    ["CD1", "CG", "CB", "CA"],
+    ["CG", "CB", "CA", "N"], # chi 1
+    ["CD1", "CG", "CB", "CA"], # chi 2
     ["CD2", "CG", "CB", "CA"],
     ["CE1", "CD1", "CG", "CB"],
     ["CE2", "CD2", "CG", "CB"],

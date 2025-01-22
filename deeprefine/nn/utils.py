@@ -29,3 +29,20 @@ def linlogcut(x, a=0, b=1000):
     # make sure everything is finite
     y = torch.where(torch.isfinite(y), y, b * torch.ones_like(y))
     return y
+
+
+def sigma_tilt(x, A=5, B=1e6, C=3e5, D=5, alpha=1.0):
+    """
+    Transform function for rugged loss function, adapted from 
+    OpenMM loss for AF2 training, 10.1016/j.bpj.2023.12.011
+    """
+    return alpha * (1/(1/A + torch.exp(-(D*x + B)/C)) - A + 1)
+
+
+def sigma_star_generator(alpha=1.0, uplimit=1e12, A=5, B=1e6, C=3e5, D=5):
+    """
+    Generate a transform function
+    """
+    def sigma_star(x):
+       return alpha * (x / uplimit + sigma_tilt(x, A, B, C, D))
+    return sigma_star
