@@ -28,7 +28,7 @@ def rmsd(xyz1, xyz2):
     return torch.square(xyz1 - xyz2).sum(dim=-1).mean(dim=0).sqrt()
 
 
-def rbr_quat_lbfgs(xyz, dcp, lr=150.0, n_steps=15, loss_track=[], solvent=False, verbose=True):
+def rbr_quat_lbfgs(xyz, dcp, lr=0.001, n_steps=15, loss_track=[], solvent=False, verbose=True):
     def closure():
         optimizer.zero_grad()
         temp_R = dr.geometry.quaternions_to_SO3(q)

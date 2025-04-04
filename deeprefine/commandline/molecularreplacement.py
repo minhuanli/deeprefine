@@ -27,84 +27,84 @@ class ArgumentParser(argparse.ArgumentParser):
             "--outdir", 
             type=str, 
             default='./mr_solution/',
-            help="The path of output folder dir",
+            help="The path of output folder dir, default ./mr_solution/",
         )
 
         self.add_argument( 
             "--Fcolumn", 
             type=str, 
             default='FP',
-            help="Column name of the structure factor magnitude."
+            help="Column name of the structure factor magnitude, default FP"
         )
 
         self.add_argument( 
             "--SigFcolumn", 
             type=str, 
             default='SIGFP',
-            help="Column name of the structure factor magnitude standard deviation."
+            help="Column name of the structure factor magnitude standard deviation, default SIGFP"
         )
 
         self.add_argument( 
             "--freeflag", 
             type=str, 
             default='FREE',
-            help="Column name of the freeflag value"
+            help="Column name of the freeflag value, default FREE"
         )
 
         self.add_argument( 
             "--testset_value", 
             type=int, 
             default=0,
-            help="testset freeflag value"
+            help="testset freeflag value, default 0"
         )
 
         self.add_argument( 
             "--dmin", 
             type=float, 
             default=4.0,
-            help="High resolution cutoff"
+            help="High resolution cutoff, default 4.0"
         )
 
         self.add_argument( 
             "--pts_min", 
             type=float, 
             default=7.0,
-            help="Minimum patterson vector length in rotation search"
+            help="Minimum patterson vector length in rotation search, default 7.0"
         )
 
         self.add_argument( 
             "--pts_max", 
             type=float, 
             default=12.0,
-            help="Maximum patterson vector length in rotation search"
+            help="Maximum patterson vector length in rotation search, default 12.0"
         )
 
         self.add_argument( 
             "--n_rot", 
             type=int, 
             default=4,
-            help="Number of hierachical rotational search rounds"
+            help="Number of hierachical rotational search rounds, default 4"
         )
 
         self.add_argument( 
             "--n_trans", 
             type=int, 
             default=4,
-            help="Number of hierachical translational search rounds"
+            help="Number of hierachical translational search rounds, default 4"
         )
 
         self.add_argument( 
             "--trans_basegrid", 
             type=int, 
             default=24,
-            help="Number of grid per axis for initial translational search"
+            help="Number of grid per axis for initial translational search, default 24"
         )
 
         self.add_argument( 
             "--rot_basegrid", 
             type=int, 
             default=1,
-            help="Grid resolution for base rotation search, 1 ~ 30, 2 ~ 15"
+            help="Grid resolution for base rotation search, 1 ~ 30', 2 ~ 15', default 1"
         )
 
         self.add_argument(
@@ -406,7 +406,6 @@ def MR_pipeline(pdb_path,
     torch.cuda.empty_cache()
     logger.debug(f"Memory peak: {torch.cuda.max_memory_allocated() / 10**9:.2f}G, Memory current: {torch.cuda.memory_allocated() / 10**9:.2f}G")
 
-    # TODO: No need to do search on polar axis
     logger.info("="*30)
     polar_axis = sfc.get_polar_axis(dcp.space_group)
     logger.info(f"Polar Axis: {polar_axis}")
