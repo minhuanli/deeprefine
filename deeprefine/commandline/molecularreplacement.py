@@ -47,15 +47,15 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument( 
             "--freeflag", 
             type=str, 
-            default='FREE',
-            help="Column name of the freeflag value, default FREE"
+            default='R-free-flags',
+            help="Column name of the freeflag value, default R-free-flags, Phenix(CNS/XPOLAR) convention"
         )
 
         self.add_argument( 
             "--testset_value", 
             type=int, 
-            default=0,
-            help="testset freeflag value, default 0"
+            default=1,
+            help="testset freeflag value, default 1"
         )
 
         self.add_argument( 
@@ -110,7 +110,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "--solvent", 
             action="store_true",
-            help="Use solvent mask"
+            help="Use solvent mask in grid search"
         )
 
         self.add_argument(
@@ -265,7 +265,7 @@ def MR_pipeline(pdb_path,
     logger.info(f"UnitCell: {dcp.unit_cell.parameters}")
     st_rmcom = dcp.atom_pos_orth - torch.mean(dcp.atom_pos_orth, dim=0)
     if plddt2pseudoB:
-        logger.info(f"Converting PLDDT to pseudo B factors...")
+        logger.info("Converting PLDDT to pseudo B factors...")
         dcp.atom_b_iso = dr.utils.plddt2pseudoB(dcp.atom_b_iso)
     
     # Find the best coarse packing score to initialize
@@ -358,7 +358,7 @@ def MR_pipeline(pdb_path,
             roundi_matrix = dr.geometry.quaternions_to_SO3(roundi_quats)
         elif i == 1:
             roundi_quats, roundi_s2s1 = dr.geometry.getbestneighbors_base_SO3(
-                -zdot_score_roundi,
+                -zdot_score_roundi,  # noqa: F821
                 roundi_quats, 
                 N=40,
                 base_resol=rot_basegrid
@@ -366,7 +366,7 @@ def MR_pipeline(pdb_path,
             roundi_matrix = dr.geometry.quaternions_to_SO3(roundi_quats)
         else:
             roundi_quats, roundi_s2s1 = dr.geometry.getbestneighbors_next_SO3(
-                -zdot_score_roundi,
+                -zdot_score_roundi,  # noqa: F821
                 roundi_quats,
                 roundi_s2s1,
                 curr_res=i+rot_basegrid-1,
@@ -431,7 +431,7 @@ def MR_pipeline(pdb_path,
                 roundj_uvw_frac = np.array(np.meshgrid(u_list, v_list, w_list)).T.reshape(-1,3)
             else:
                 roundj_uvw_frac = dr.geometry.getbestneighbours_cartesian(
-                    -zfj, 
+                    -zfj,  # noqa: F821
                     roundj_uvw_frac,
                     basegrid=trans_basegrid,
                     curr_res=j,
@@ -459,9 +459,10 @@ def MR_pipeline(pdb_path,
     logger.info("="*30)
     logger.info("Gradient Descent Stage...")
     
-    _, rbred_model, _, _ = dr.utils.rbr_quat_lbfgs(replaced_model, dcp, n_steps=15, loss_track=[], solvent=solvent, verbose=False)
+    _, rbred_model, _, _ = dr.utils.rbr_quat_adam(replaced_model, dcp, lr=0.001, n_steps=100, loss_track=[], solvent=True, verbose=False)
     rbr_rmsd = dr.utils.rmsd(rbred_model, replaced_model)
     dcp.atom_pos_orth = rbred_model
+    dcp.inspect_data()
     dcp.calc_fprotein()
     if solvent:
         dcp.calc_fsolvent()
@@ -469,7 +470,7 @@ def MR_pipeline(pdb_path,
     rwork_stage3, rfree_stage3 = dcp.r_free.item(), dcp.r_work.item()
     dcp.savePDB(os.path.join(outdir, pdb_name + "_MR_stage3.pdb"))
     logger.info(f"Gradient Descent Finished, model saved at {os.path.join(outdir, pdb_name + '_MR_stage3.pdb')}")
-    logger.info(f"RMSD: {rbr_rmsd:.3f} A. Rwork: {rwork_init:.3f} -> {rwork_stage3:.3f}, Rfree: {rfree_init:.3f} -> {rfree_stage3:.3f}")
+    logger.info(f"RMSD: {rbr_rmsd:.3f} A. Rwork: {rwork_stage2:.3f} -> {rwork_stage3:.3f}, Rfree: {rfree_stage2:.3f} -> {rfree_stage3:.3f}")
 
     logger.info("Finished...")
 

@@ -28,7 +28,7 @@ def rmsd(xyz1, xyz2):
     return torch.square(xyz1 - xyz2).sum(dim=-1).mean(dim=0).sqrt()
 
 
-def rbr_quat_lbfgs(xyz, dcp, lr=0.001, n_steps=15, loss_track=[], solvent=False, verbose=True):
+def rbr_quat_lbfgs(xyz, dcp, lr=0.001, n_steps=15, loss_track=[], solvent=True, verbose=True):
     def closure():
         optimizer.zero_grad()
         temp_R = dr.geometry.quaternions_to_SO3(q)
@@ -60,6 +60,62 @@ def rbr_quat_lbfgs(xyz, dcp, lr=0.001, n_steps=15, loss_track=[], solvent=False,
     
     for k in range(n_steps):
         temp = optimizer.step(closure)
+        loss_track.append(temp.item())
+    
+    transform = dr.geometry.quaternions_to_SO3(q)
+    rbred_xyz = torch.matmul(propose_rmcom, transform.detach()) + propose_com + trans_vec.detach()
+
+    if verbose:
+        # Initial R factors
+        dcp.calc_fprotein(atoms_position_tensor=xyz)
+        dcp.calc_fsolvent()
+        dcp.calc_ftotal(Return=False)
+        rw_i, rf_i = dcp.get_rfactors()
+        
+        # RBRed R factors
+        dcp.calc_fprotein(atoms_position_tensor=rbred_xyz)
+        dcp.calc_fsolvent()
+        dcp.calc_ftotal(Return=False)
+        rw_f, rf_f = dcp.get_rfactors()
+    
+        # RBR rmsd
+        rmsd_rbr = rmsd(xyz, rbred_xyz)
+        print(f"RBR RMSD: {rmsd_rbr:.2f}, R factors: {rw_i.item():.3f}/{rf_i.item():.3f} --> {rw_f.item():.3f}/{rf_f.item():.3f}", flush=True)
+
+    return loss_track, rbred_xyz, transform.detach(), trans_vec.detach()
+
+
+def rbr_quat_adam(xyz, dcp, lr=0.001, n_steps=100, loss_track=[], solvent=True, verbose=True):
+    
+    def step():
+        optimizer.zero_grad()
+        temp_R = dr.geometry.quaternions_to_SO3(q)
+        temp_model = torch.matmul(propose_rmcom.clone().detach(), temp_R) + propose_com.clone().detach() + trans_vec
+        dcp.calc_fprotein(atoms_position_tensor=temp_model)
+        if solvent:
+            dcp.calc_fsolvent()
+        Fmodel = dcp.calc_ftotal()
+        Fmodel_mag = torch.abs(Fmodel)
+        loss = torch.sum((dcp.Fo[working_set] - Fmodel_mag[working_set])**2/dcp.SigF[working_set]**2)
+        loss.backward()
+        optimizer.step()
+        return loss
+    
+    xyz = xyz.to(dcp.device)
+    propose_rmcom = xyz - torch.mean(xyz, dim=0)
+    propose_com = torch.mean(xyz, dim=0)
+    q = torch.tensor(
+        [1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=dcp.device, requires_grad=True
+    )
+    trans_vec = torch.tensor([0.0, 0.0, 0.0], device=dcp.device, requires_grad=True)
+    optimizer = torch.optim.Adam(
+        [q, trans_vec],
+        lr=lr,
+    )
+    working_set = (~dcp.free_flag) & (~dcp.Outlier)
+    
+    for k in range(n_steps):
+        temp = step()
         loss_track.append(temp.item())
     
     transform = dr.geometry.quaternions_to_SO3(q)
